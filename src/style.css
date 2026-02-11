@@ -1,0 +1,60 @@
+/* بارگذاری فونت وزیرمتن - باید در ابتدای فایل باشد */
+@import url('https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* تنظیمات پایه */
+body {
+  font-family: 'Vazirmatn', sans-serif;
+  background-color: #fafaf9; /* stone-50 */
+  color: #1c1917; /* stone-900 */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+/* اسکرول نرم */
+html {
+  scroll-behavior: smooth;
+}
+
+/* استایل اسکرول بار */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #f5f5f4; 
+}
+::-webkit-scrollbar-thumb {
+  background: #d6d3d1; 
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #a8a29e; 
+}
+
+/* کلاس‌های کمکی برای انیمیشن */
+.delay-100 { animation-delay: 100ms; }
+.delay-200 { animation-delay: 200ms; }
+.delay-300 { animation-delay: 300ms; }
+.delay-400 { animation-delay: 400ms; }
+.delay-500 { animation-delay: 500ms; }
+.delay-700 { animation-delay: 700ms; }
+
+/* افکت گرین (Grain) برای حس طبیعی */
+.bg-grain {
+  position: relative;
+}
+.bg-grain::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 0;
+}
