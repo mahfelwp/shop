@@ -23,6 +23,7 @@ export default defineConfig({
       // حذف صفحات ادمین، پروفایل، سبد خرید و چک‌اوت از پروسه بیلد استاتیک
       // این صفحات به صورت SPA در مرورگر کاربر رندر می‌شوند
       return paths.filter(i => 
+	!i.includes('/login') && 
         !i.includes('/admin') && 
         !i.includes('/profile') && 
         !i.includes('/cart') && 
