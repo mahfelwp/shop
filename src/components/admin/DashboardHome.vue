@@ -1,14 +1,35 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useAdminStore } from '@/stores/admin'
-import { TrendingUp, DollarSign, ShoppingBag, Clock, ArrowLeft, CheckCircle2, AlertCircle } from 'lucide-vue-next'
+import { supabase } from '@/lib/supabase'
+import { TrendingUp, DollarSign, ShoppingBag, Clock, ArrowLeft, CheckCircle2, AlertCircle, AlertTriangle, ArrowRight } from 'lucide-vue-next'
 import SimpleBarChart from '@/components/admin/charts/SimpleBarChart.vue'
+import { useRouter } from 'vue-router'
 
 const adminStore = useAdminStore()
+const router = useRouter()
+const lowStockProducts = ref<any[]>([])
+const loadingLowStock = ref(false)
 
-onMounted(() => {
+onMounted(async () => {
   adminStore.fetchStats()
+  fetchLowStock()
 })
+
+// دریافت کالاهای کم موجودی برای نمایش در داشبورد
+const fetchLowStock = async () => {
+  loadingLowStock.value = true
+  const { data } = await supabase
+    .from('products')
+    .select('id, title, stock, image')
+    .lt('stock', 10) // کمتر از ۱۰
+    .limit(3)
+  
+  if (data) {
+    lowStockProducts.value = data
+  }
+  loadingLowStock.value = false
+}
 
 // محاسبه سفارشات اخیر از استور (واقعی)
 const recentOrders = computed(() => {
@@ -73,6 +94,24 @@ const getStatusText = (status: string) => {
 <template>
   <div class="space-y-6">
     
+    <!-- Low Stock Alert Banner (New) -->
+    <div v-if="lowStockProducts.length > 0" class="bg-orange-50 border border-orange-100 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 animate-fade-in">
+      <div class="flex items-center gap-4">
+        <div class="bg-white p-2 rounded-xl text-orange-500 shadow-sm">
+          <AlertTriangle class="w-6 h-6" />
+        </div>
+        <div>
+          <h3 class="font-bold text-orange-900">هشدار موجودی انبار</h3>
+          <p class="text-sm text-orange-700 mt-1">
+            موجودی {{ lowStockProducts.length }} محصول رو به اتمام است. لطفاً انبار را بررسی کنید.
+          </p>
+        </div>
+      </div>
+      <button @click="router.push({ name: 'admin-inventory' })" class="bg-white text-orange-600 border border-orange-200 px-4 py-2 rounded-xl text-sm font-bold hover:bg-orange-100 transition flex items-center gap-2 whitespace-nowrap">
+        مدیریت موجودی <ArrowLeft class="w-4 h-4" />
+      </button>
+    </div>
+
     <!-- Stats Grid -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
       <!-- Revenue Card -->

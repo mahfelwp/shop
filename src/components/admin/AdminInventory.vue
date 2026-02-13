@@ -2,12 +2,13 @@
 import { ref, onMounted, computed } from 'vue'
 import { supabase } from '@/lib/supabase'
 import { useToastStore } from '@/stores/toast'
-import { Search, Save, AlertTriangle, CheckCircle2, PackageX, Loader2 } from 'lucide-vue-next'
+import { Search, Save, AlertTriangle, CheckCircle2, PackageX, Loader2, Info, Filter } from 'lucide-vue-next'
 
 const products = ref<any[]>([])
 const loading = ref(true)
 const saving = ref(false)
 const searchQuery = ref('')
+const showLowStockOnly = ref(false) // فیلتر نمایش کالاهای کم موجودی
 const toastStore = useToastStore()
 
 // دریافت محصولات واقعی به همراه موجودی از دیتابیس
@@ -29,7 +30,18 @@ const fetchProducts = async () => {
 }
 
 const filteredProducts = computed(() => {
-  return products.value.filter(p => p.title.toLowerCase().includes(searchQuery.value.toLowerCase()))
+  let result = products.value.filter(p => p.title.toLowerCase().includes(searchQuery.value.toLowerCase()))
+  
+  // اعمال فیلتر موجودی کم
+  if (showLowStockOnly.value) {
+    result = result.filter(p => p.stock < 10)
+  }
+  
+  return result
+})
+
+const lowStockCount = computed(() => {
+  return products.value.filter(p => p.stock < 10).length
 })
 
 const getStockStatus = (count: number) => {
@@ -78,18 +90,9 @@ onMounted(fetchProducts)
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
       <div>
         <h2 class="text-2xl font-bold text-gray-800">مدیریت موجودی انبار</h2>
-        <p class="text-gray-500 text-sm mt-1">کنترل تعداد محصولات و وضعیت انبار (داده‌های واقعی)</p>
+        <p class="text-gray-500 text-sm mt-1">کنترل تعداد محصولات و وضعیت انبار</p>
       </div>
       <div class="flex gap-3">
-        <div class="relative">
-          <input 
-            v-model="searchQuery"
-            type="text" 
-            placeholder="جستجوی محصول..." 
-            class="pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none w-64 transition bg-white"
-          />
-          <Search class="w-4 h-4 text-gray-400 absolute left-3 top-3.5" />
-        </div>
         <button 
           @click="saveChanges" 
           :disabled="saving"
@@ -102,9 +105,50 @@ onMounted(fetchProducts)
       </div>
     </div>
 
+    <!-- Low Stock Notification Banner (New Feature) -->
+    <div class="bg-indigo-50 border border-indigo-100 rounded-2xl p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <div class="flex items-start gap-4">
+        <div class="bg-white p-2 rounded-xl text-indigo-600 shadow-sm">
+          <Info class="w-6 h-6" />
+        </div>
+        <div>
+          <h3 class="font-bold text-indigo-900 mb-1">اطلاع از کاهش موجودی</h3>
+          <p class="text-sm text-indigo-700 leading-relaxed max-w-2xl">
+            هر زمان موجودی یک محصول از حد تعیین شده کمتر شود، به شما اطلاع داده خواهد شد. به این ترتیب، هیچ‌وقت با کمبود موجودی غافلگیر نخواهید شد.
+          </p>
+        </div>
+      </div>
+      
+      <button 
+        @click="showLowStockOnly = !showLowStockOnly"
+        class="whitespace-nowrap px-4 py-2 rounded-xl text-sm font-bold transition flex items-center gap-2"
+        :class="showLowStockOnly ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-indigo-600 border border-indigo-200 hover:bg-indigo-50'"
+      >
+        <Filter class="w-4 h-4" />
+        <span v-if="showLowStockOnly">نمایش همه محصولات</span>
+        <span v-else>نمایش کالاهای رو به اتمام ({{ lowStockCount }})</span>
+      </button>
+    </div>
+
     <!-- Inventory Table -->
     <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
       
+      <!-- Search Bar inside table header area -->
+      <div class="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+        <div class="relative w-full max-w-md">
+          <input 
+            v-model="searchQuery"
+            type="text" 
+            placeholder="جستجوی نام محصول..." 
+            class="pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none w-full transition bg-white"
+          />
+          <Search class="w-4 h-4 text-gray-400 absolute left-3 top-3.5" />
+        </div>
+        <div class="text-xs text-gray-500 font-medium">
+          نمایش {{ filteredProducts.length }} محصول
+        </div>
+      </div>
+
       <div v-if="loading" class="p-12 text-center text-gray-400 flex flex-col items-center">
         <Loader2 class="w-8 h-8 animate-spin mb-2" />
         در حال دریافت اطلاعات انبار...
@@ -148,6 +192,7 @@ onMounted(fetchProducts)
                     type="number" 
                     v-model="product.stock" 
                     class="w-16 text-center font-bold text-gray-800 bg-transparent outline-none border-b border-gray-200 focus:border-indigo-500 py-1"
+                    :class="product.stock < 10 ? 'text-red-600' : ''"
                   />
                   <button @click="updateLocalStock(product.id, 1)" class="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center hover:bg-gray-100 text-gray-600 transition">+</button>
                 </div>
@@ -161,7 +206,7 @@ onMounted(fetchProducts)
       </div>
       
       <div v-if="!loading && filteredProducts.length === 0" class="p-12 text-center text-gray-400">
-        محصولی یافت نشد.
+        محصولی با این مشخصات یافت نشد.
       </div>
     </div>
   </div>

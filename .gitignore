@@ -27,7 +27,6 @@ node_modules
 dist
 dist-ssr
 coverage
-.vite-ssg-temp
 
 # Local env files
 .env
@@ -39,4 +38,6 @@ coverage
 
 # Vite
 *.local
+.vite-ssg-temp
 db
+ 
