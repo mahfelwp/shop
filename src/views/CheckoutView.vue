@@ -1,17 +1,19 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
 import { useCartStore } from '@/stores/cart'
 import { useAuthStore } from '@/stores/auth'
 import { useSettingsStore } from '@/stores/settings'
 import { useToastStore } from '@/stores/toast'
+import { useCouponStore } from '@/stores/coupon'
 import { useRouter } from 'vue-router'
 import { supabase } from '@/lib/supabase'
-import { CreditCard, MapPin, Loader2, Upload, AlertCircle, Copy, Plus, FileText, X } from 'lucide-vue-next'
+import { CreditCard, MapPin, Loader2, Upload, AlertCircle, Copy, Plus, FileText, X, Ticket } from 'lucide-vue-next'
  
 const cartStore = useCartStore()
 const authStore = useAuthStore()
 const settingsStore = useSettingsStore()
 const toastStore = useToastStore()
+const couponStore = useCouponStore()
 const router = useRouter()
 const loading = ref(false)
  
@@ -33,6 +35,14 @@ const form = ref({
   postalCode: '',
   note: ''
 })
+ 
+// Coupon State
+const couponCode = ref('')
+const couponLoading = ref(false)
+const appliedCoupon = ref<any>(null)
+const discountAmount = ref(0)
+const couponMessage = ref('')
+const couponMessageType = ref<'success' | 'error'>('success')
  
 onMounted(async () => {
   if (cartStore.totalItems === 0) {
@@ -72,20 +82,64 @@ watch(selectedAddressId, (newVal) => {
       form.value.address = addr.address
       form.value.postalCode = addr.postal_code || ''
       form.value.phone = addr.phone || authStore.profile?.phone || ''
-      // Note: Saved addresses might not have full name stored, keeping current or profile name
     }
   }
 })
+ 
+// محاسبه قیمت نهایی
+const finalPrice = computed(() => {
+  const total = cartStore.totalPrice - discountAmount.value
+  return total > 0 ? total : 0
+})
+ 
+const checkCoupon = async () => {
+  if (!couponCode.value) return
+  
+  couponLoading.value = true
+  couponMessage.value = ''
+  
+  const result = await couponStore.validateCoupon(couponCode.value, cartStore.totalPrice)
+  
+  if (result.valid && result.coupon) {
+    appliedCoupon.value = result.coupon
+    
+    // محاسبه مقدار تخفیف
+    if (result.coupon.discount_type === 'percent') {
+      discountAmount.value = Math.round((cartStore.totalPrice * result.coupon.amount) / 100)
+    } else {
+      discountAmount.value = result.coupon.amount
+    }
+    
+    // محدود کردن تخفیف به کل مبلغ سبد (نباید منفی شود)
+    if (discountAmount.value > cartStore.totalPrice) {
+      discountAmount.value = cartStore.totalPrice
+    }
+ 
+    couponMessageType.value = 'success'
+    couponMessage.value = 'کد تخفیف با موفقیت اعمال شد'
+    toastStore.showToast('کد تخفیف اعمال شد', 'success')
+  } else {
+    appliedCoupon.value = null
+    discountAmount.value = 0
+    couponMessageType.value = 'error'
+    couponMessage.value = result.message || 'کد تخفیف نامعتبر است'
+  }
+  
+  couponLoading.value = false
+}
+ 
+const removeCoupon = () => {
+  appliedCoupon.value = null
+  discountAmount.value = 0
+  couponCode.value = ''
+  couponMessage.value = ''
+}
  
 const handleFileUpload = (event: Event) => {
   const target = event.target as HTMLInputElement
   if (target.files && target.files[0]) {
     receiptFile.value = target.files[0]
     receiptPreview.value = URL.createObjectURL(target.files[0])
-    // Clear error for file input if any
-    if (showErrors.value) {
-      // Logic handled in template reactivity
-    }
   }
 }
  
@@ -116,7 +170,6 @@ const handlePayment = async () => {
  
   if (!isAddressValid) {
     toastStore.showToast('لطفا فیلدهای ستاره‌دار (ضروری) را تکمیل کنید', 'error')
-    // Scroll to top to see errors
     window.scrollTo({ top: 0, behavior: 'smooth' })
     return
   }
@@ -149,7 +202,9 @@ const handlePayment = async () => {
       .from('orders')
       .insert({
         user_id: authStore.user.id,
-        total_price: cartStore.totalPrice,
+        total_price: finalPrice.value, // استفاده از قیمت نهایی با تخفیف
+        discount_amount: discountAmount.value, // ذخیره مبلغ تخفیف
+        coupon_id: appliedCoupon.value?.id || null, // ذخیره شناسه کوپن
         status: status,
         shipping_address: `${form.value.address} - کدپستی: ${form.value.postalCode}`,
         receiver_name: form.value.fullName,
@@ -175,6 +230,11 @@ const handlePayment = async () => {
       .insert(orderItems)
  
     if (itemsError) throw itemsError
+ 
+    // افزایش تعداد استفاده از کد تخفیف
+    if (appliedCoupon.value) {
+      await couponStore.incrementUsage(appliedCoupon.value.id)
+    }
  
     if (paymentMethod.value === 'online') {
       console.log('Redirecting to ZarinPal...')
@@ -433,11 +493,66 @@ const handlePayment = async () => {
       <!-- Summary & Pay Button -->
       <div class="lg:col-span-1">
         <div class="bg-white p-6 rounded-2xl border border-primary-100 sticky top-32">
+          
+          <!-- Coupon Section -->
+          <div class="mb-6 border-b border-gray-100 pb-6">
+            <label class="text-sm font-bold text-gray-700 mb-2 block flex items-center gap-2">
+              <Ticket class="w-4 h-4" />
+              کد تخفیف دارید؟
+            </label>
+            
+            <div v-if="!appliedCoupon" class="flex gap-2">
+              <input 
+                v-model="couponCode" 
+                type="text" 
+                placeholder="کد تخفیف..." 
+                class="flex-grow px-3 py-2 rounded-lg border border-gray-300 focus:border-stone-900 outline-none text-sm uppercase font-mono"
+                @keyup.enter="checkCoupon"
+              />
+              <button 
+                @click="checkCoupon" 
+                :disabled="couponLoading || !couponCode"
+                class="bg-stone-900 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-stone-800 transition disabled:opacity-70"
+              >
+                <Loader2 v-if="couponLoading" class="w-4 h-4 animate-spin" />
+                <span v-else>ثبت</span>
+              </button>
+            </div>
+ 
+            <div v-else class="bg-green-50 border border-green-200 rounded-lg p-3 flex justify-between items-center">
+              <div>
+                <span class="font-bold text-green-700 text-sm block">{{ appliedCoupon.code }}</span>
+                <span class="text-xs text-green-600">تخفیف اعمال شد</span>
+              </div>
+              <button @click="removeCoupon" class="text-red-500 hover:text-red-700 p-1">
+                <X class="w-4 h-4" />
+              </button>
+            </div>
+ 
+            <p v-if="couponMessage" class="text-xs mt-2" :class="couponMessageType === 'success' ? 'text-green-600' : 'text-red-500'">
+              {{ couponMessage }}
+            </p>
+          </div>
+ 
           <h2 class="font-bold text-lg mb-4 text-gray-800">مبلغ قابل پرداخت</h2>
           
-          <div class="flex justify-between items-center mb-6">
-            <span class="text-gray-600">جمع کل خرید</span>
-            <span class="font-bold text-xl text-primary-700">{{ cartStore.totalPrice.toLocaleString() }} <span class="text-sm font-normal">تومان</span></span>
+          <div class="space-y-3 mb-6">
+            <div class="flex justify-between items-center text-gray-600">
+              <span>جمع کل خرید</span>
+              <span>{{ cartStore.totalPrice.toLocaleString() }} <span class="text-xs">تومان</span></span>
+            </div>
+            
+            <div v-if="discountAmount > 0" class="flex justify-between items-center text-red-500 font-bold">
+              <span>تخفیف</span>
+              <span>{{ discountAmount.toLocaleString() }}- <span class="text-xs">تومان</span></span>
+            </div>
+ 
+            <div class="border-t border-dashed border-gray-200 my-2"></div>
+ 
+            <div class="flex justify-between items-center">
+              <span class="font-bold text-gray-800">مبلغ نهایی</span>
+              <span class="font-black text-xl text-primary-700">{{ finalPrice.toLocaleString() }} <span class="text-sm font-normal">تومان</span></span>
+            </div>
           </div>
  
           <button 
