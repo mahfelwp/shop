@@ -3,17 +3,17 @@ import { ref, onMounted, computed } from 'vue'
 import { useAdminStore } from '@/stores/admin'
 import { useToastStore } from '@/stores/toast'
 import { supabase } from '@/lib/supabase'
-import { Edit, CreditCard, DollarSign, Truck, Eye, X, ImageIcon, Save, Trash2, Plus, Search, Package, MapPin, User, Phone } from 'lucide-vue-next'
-
+import { Edit, CreditCard, DollarSign, Truck, Eye, X, ImageIcon, Save, Trash2, Plus, Search, Package, MapPin, User, Phone, Loader2 } from 'lucide-vue-next'
+ 
 const adminStore = useAdminStore()
 const toastStore = useToastStore()
-
+ 
 const showModal = ref(false)
 const showReceiptModal = ref(false)
 const selectedOrder = ref<any>(null)
 const receiptImage = ref('')
 const activeTab = ref<'status' | 'items' | 'shipping'>('status')
-
+ 
 // Data for editing
 const allProducts = ref<any[]>([])
 const productSearch = ref('')
@@ -26,22 +26,30 @@ const statusForm = ref({
   status: '',
   tracking_code: ''
 })
-
+ 
 const loadingProducts = ref(false)
-
+ 
 onMounted(async () => {
+  // دریافت لیست سفارشات
+  if (adminStore.orders.length === 0) {
+    await adminStore.fetchStats()
+  } else {
+    // جهت اطمینان از بروز بودن دیتا، در پس‌زمینه آپدیت می‌کنیم
+    adminStore.fetchStats()
+  }
+ 
   // دریافت لیست محصولات برای افزودن به سفارش
   loadingProducts.value = true
   const { data } = await supabase.from('products').select('id, title, price, image, stock')
   if (data) allProducts.value = data
   loadingProducts.value = false
 })
-
+ 
 const filteredProducts = computed(() => {
   if (!productSearch.value) return []
   return allProducts.value.filter(p => p.title.toLowerCase().includes(productSearch.value.toLowerCase())).slice(0, 5)
 })
-
+ 
 const openModal = (order: any) => {
   selectedOrder.value = JSON.parse(JSON.stringify(order)) // Deep copy to avoid direct mutation issues
   
@@ -56,14 +64,14 @@ const openModal = (order: any) => {
   activeTab.value = 'status'
   showModal.value = true
 }
-
+ 
 const viewReceipt = (url: string) => {
   receiptImage.value = url
   showReceiptModal.value = true
 }
-
+ 
 // --- Status & Payment Actions ---
-
+ 
 const updateStatus = async () => {
   if (!selectedOrder.value) return
   const error = await adminStore.updateOrderStatus(selectedOrder.value.id, statusForm.value.status, statusForm.value.tracking_code)
@@ -76,7 +84,7 @@ const updateStatus = async () => {
     toastStore.showToast('خطا در بروزرسانی', 'error')
   }
 }
-
+ 
 const verifyPayment = async (approved: boolean) => {
   if (!selectedOrder.value) return
   const newStatus = approved ? 'paid' : 'cancelled'
@@ -87,9 +95,9 @@ const verifyPayment = async (approved: boolean) => {
     selectedOrder.value.status = newStatus
   }
 }
-
+ 
 // --- Shipping Info Actions ---
-
+ 
 const saveShippingInfo = async () => {
   if (!selectedOrder.value) return
   
@@ -101,7 +109,7 @@ const saveShippingInfo = async () => {
       shipping_address: shippingForm.value.shipping_address
     })
     .eq('id', selectedOrder.value.id)
-
+ 
   if (!error) {
     toastStore.showToast('اطلاعات ارسال ذخیره شد', 'success')
     // Update main list locally
@@ -115,22 +123,22 @@ const saveShippingInfo = async () => {
     toastStore.showToast('خطا در ذخیره اطلاعات', 'error')
   }
 }
-
+ 
 // --- Order Items Actions ---
-
+ 
 const recalculateTotal = async () => {
   if (!selectedOrder.value) return
   
   const newTotal = selectedOrder.value.order_items.reduce((sum: number, item: any) => {
     return sum + (item.price_at_purchase * item.quantity)
   }, 0)
-
+ 
   // Update DB
   const { error } = await supabase
     .from('orders')
     .update({ total_price: newTotal })
     .eq('id', selectedOrder.value.id)
-
+ 
   if (!error) {
     selectedOrder.value.total_price = newTotal
     // Update main list
@@ -138,16 +146,16 @@ const recalculateTotal = async () => {
     if (idx !== -1) adminStore.orders[idx].total_price = newTotal
   }
 }
-
+ 
 const updateItemQty = async (item: any, change: number) => {
   const newQty = item.quantity + change
   if (newQty < 1) return
-
+ 
   const { error } = await supabase
     .from('order_items')
     .update({ quantity: newQty })
     .eq('id', item.id)
-
+ 
   if (!error) {
     item.quantity = newQty
     await recalculateTotal()
@@ -156,15 +164,15 @@ const updateItemQty = async (item: any, change: number) => {
     toastStore.showToast('خطا در تغییر تعداد', 'error')
   }
 }
-
+ 
 const removeItem = async (itemId: number) => {
   if (!confirm('آیا از حذف این آیتم اطمینان دارید؟')) return
-
+ 
   const { error } = await supabase
     .from('order_items')
     .delete()
     .eq('id', itemId)
-
+ 
   if (!error) {
     selectedOrder.value.order_items = selectedOrder.value.order_items.filter((i: any) => i.id !== itemId)
     await recalculateTotal()
@@ -173,7 +181,7 @@ const removeItem = async (itemId: number) => {
     toastStore.showToast('خطا در حذف آیتم', 'error')
   }
 }
-
+ 
 const addItemToOrder = async (product: any) => {
   // Check if already exists
   const existingItem = selectedOrder.value.order_items.find((i: any) => i.product_id === product.id)
@@ -183,7 +191,7 @@ const addItemToOrder = async (product: any) => {
     productSearch.value = ''
     return
   }
-
+ 
   // Insert new item
   const newItem = {
     order_id: selectedOrder.value.id,
@@ -191,7 +199,7 @@ const addItemToOrder = async (product: any) => {
     quantity: 1,
     price_at_purchase: product.price
   }
-
+ 
   const { data, error } = await supabase
     .from('order_items')
     .insert(newItem)
@@ -200,7 +208,7 @@ const addItemToOrder = async (product: any) => {
       products (title, image, category)
     `)
     .single()
-
+ 
   if (!error && data) {
     selectedOrder.value.order_items.push(data)
     await recalculateTotal()
@@ -210,9 +218,9 @@ const addItemToOrder = async (product: any) => {
     toastStore.showToast('خطا در افزودن محصول', 'error')
   }
 }
-
+ 
 // --- Helpers ---
-
+ 
 const getStatusLabel = (status: string) => {
   const map: Record<string, string> = {
     'pending': 'در انتظار پرداخت',
@@ -225,7 +233,7 @@ const getStatusLabel = (status: string) => {
   }
   return map[status] || status
 }
-
+ 
 const getStatusColor = (status: string) => {
   const map: Record<string, string> = {
     'pending': 'bg-yellow-100 text-yellow-800',
@@ -239,14 +247,27 @@ const getStatusColor = (status: string) => {
   return map[status] || 'bg-gray-100'
 }
 </script>
-
+ 
 <template>
   <div class="bg-white rounded-2xl shadow-sm border border-stone-100 overflow-hidden animate-fade-in">
     <div class="p-6 border-b border-stone-100 flex justify-between items-center">
       <span class="font-bold text-lg">مدیریت سفارشات</span>
-      <button @click="adminStore.fetchStats" class="text-sm text-blue-600 hover:underline">بروزرسانی لیست</button>
+      <button @click="adminStore.fetchStats" class="text-sm text-blue-600 hover:underline flex items-center gap-1">
+        <Loader2 v-if="adminStore.loading" class="w-3 h-3 animate-spin" />
+        بروزرسانی لیست
+      </button>
     </div>
-    <div class="overflow-x-auto">
+    
+    <div v-if="adminStore.loading && adminStore.orders.length === 0" class="p-12 text-center text-stone-400">
+      <Loader2 class="w-8 h-8 animate-spin mx-auto mb-2" />
+      در حال دریافت سفارشات...
+    </div>
+ 
+    <div v-else-if="adminStore.orders.length === 0" class="p-12 text-center text-stone-400">
+      هیچ سفارشی یافت نشد.
+    </div>
+ 
+    <div v-else class="overflow-x-auto">
       <table class="w-full text-right">
         <thead class="bg-stone-50 text-stone-500 text-sm">
           <tr>
@@ -281,7 +302,7 @@ const getStatusColor = (status: string) => {
         </tbody>
       </table>
     </div>
-
+ 
     <!-- Order Modal -->
     <div v-if="showModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div class="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden animate-scale-in max-h-[90vh] flex flex-col">
@@ -294,7 +315,7 @@ const getStatusColor = (status: string) => {
           </div>
           <button @click="showModal = false"><X class="w-5 h-5" /></button>
         </div>
-
+ 
         <!-- Tabs -->
         <div class="flex border-b border-stone-200 bg-stone-50 shrink-0">
           <button 
@@ -335,7 +356,7 @@ const getStatusColor = (status: string) => {
                 <div class="font-bold text-stone-800">{{ selectedOrder?.payment_method === 'card_to_card' ? 'کارت به کارت' : 'آنلاین' }}</div>
               </div>
             </div>
-
+ 
             <!-- Receipt Check -->
             <div v-if="selectedOrder?.payment_method === 'card_to_card' && selectedOrder?.status === 'pending_approval'" class="space-y-3 border-t border-stone-100 pt-4">
               <label class="block text-sm font-bold text-stone-700">بررسی فیش واریزی</label>
@@ -351,7 +372,7 @@ const getStatusColor = (status: string) => {
                 <button @click="verifyPayment(false)" class="flex-1 bg-red-500 text-white py-2 rounded-lg text-sm font-bold hover:bg-red-600 transition">رد پرداخت</button>
               </div>
             </div>
-
+ 
             <!-- Status Update -->
             <div class="space-y-4 border-t border-stone-100 pt-4">
               <div>
@@ -366,7 +387,7 @@ const getStatusColor = (status: string) => {
                   <option value="cancelled">لغو شده</option>
                 </select>
               </div>
-
+ 
               <div v-if="statusForm.status === 'shipped' || statusForm.status === 'delivered'">
                 <label class="block text-sm font-bold text-stone-700 mb-2">کد رهگیری پستی</label>
                 <div class="relative">
@@ -374,13 +395,13 @@ const getStatusColor = (status: string) => {
                   <Truck class="w-5 h-5 text-stone-400 absolute left-3 top-3.5" />
                 </div>
               </div>
-
+ 
               <button @click="updateStatus" class="w-full bg-stone-900 text-white py-3 rounded-xl font-bold hover:bg-accent transition flex items-center justify-center gap-2">
                 <Save class="w-4 h-4" /> ذخیره تغییرات وضعیت
               </button>
             </div>
           </div>
-
+ 
           <!-- TAB 2: ORDER ITEMS -->
           <div v-if="activeTab === 'items'" class="space-y-6 animate-fade-in">
             <!-- Add Item -->
@@ -413,7 +434,7 @@ const getStatusColor = (status: string) => {
                 </div>
               </div>
             </div>
-
+ 
             <!-- Items List -->
             <div class="space-y-3">
               <div v-for="item in selectedOrder.order_items" :key="item.id" class="flex items-center gap-3 p-3 border border-stone-200 rounded-xl bg-white">
@@ -423,29 +444,29 @@ const getStatusColor = (status: string) => {
                   <div class="font-bold text-stone-800 text-sm truncate">{{ item.products?.title }}</div>
                   <div class="text-xs text-stone-500 mt-1">{{ item.price_at_purchase.toLocaleString() }} تومان</div>
                 </div>
-
+ 
                 <div class="flex items-center gap-2 bg-stone-50 rounded-lg border border-stone-200 px-1">
                   <button @click="updateItemQty(item, 1)" class="p-1 hover:text-green-600"><Plus class="w-3 h-3" /></button>
                   <span class="w-6 text-center font-bold text-sm">{{ item.quantity }}</span>
                   <button @click="updateItemQty(item, -1)" class="p-1 hover:text-red-600" :disabled="item.quantity <= 1"><div class="w-2 h-0.5 bg-current"></div></button>
                 </div>
-
+ 
                 <div class="font-bold text-sm w-20 text-left">
                   {{ (item.price_at_purchase * item.quantity).toLocaleString() }}
                 </div>
-
+ 
                 <button @click="removeItem(item.id)" class="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition">
                   <Trash2 class="w-4 h-4" />
                 </button>
               </div>
             </div>
-
+ 
             <div class="bg-stone-50 p-4 rounded-xl flex justify-between items-center border border-stone-200">
               <span class="font-bold text-stone-700">مجموع کل جدید:</span>
               <span class="font-black text-xl text-accent">{{ selectedOrder.total_price.toLocaleString() }} تومان</span>
             </div>
           </div>
-
+ 
           <!-- TAB 3: SHIPPING INFO -->
           <div v-if="activeTab === 'shipping'" class="space-y-4 animate-fade-in">
             <div>
@@ -455,7 +476,7 @@ const getStatusColor = (status: string) => {
                 <User class="w-5 h-5 text-stone-400 absolute right-3 top-3.5" />
               </div>
             </div>
-
+ 
             <div>
               <label class="block text-sm font-bold text-stone-700 mb-2">شماره تماس</label>
               <div class="relative">
@@ -463,7 +484,7 @@ const getStatusColor = (status: string) => {
                 <Phone class="w-5 h-5 text-stone-400 absolute right-3 top-3.5" />
               </div>
             </div>
-
+ 
             <div>
               <label class="block text-sm font-bold text-stone-700 mb-2">آدرس کامل پستی</label>
               <div class="relative">
@@ -471,14 +492,14 @@ const getStatusColor = (status: string) => {
                 <MapPin class="w-5 h-5 text-stone-400 absolute right-3 top-3.5" />
               </div>
             </div>
-
+ 
             <button @click="saveShippingInfo" class="w-full bg-stone-900 text-white py-3 rounded-xl font-bold hover:bg-accent transition flex items-center justify-center gap-2">
               <Save class="w-4 h-4" /> ذخیره اطلاعات ارسال
             </button>
           </div>
-
+ 
         </div>
-
+ 
         <!-- Modal Footer -->
         <div class="p-4 border-t border-stone-100 bg-stone-50 flex justify-end">
           <button @click="showModal = false" class="bg-white border border-stone-300 text-stone-700 px-6 py-2.5 rounded-xl font-bold hover:bg-stone-100 transition">
@@ -487,7 +508,7 @@ const getStatusColor = (status: string) => {
         </div>
       </div>
     </div>
-
+ 
     <!-- Receipt Modal -->
     <div v-if="showReceiptModal" class="fixed inset-0 bg-black/80 z-[60] flex items-center justify-center p-4" @click="showReceiptModal = false">
       <div class="relative max-w-3xl max-h-full">
