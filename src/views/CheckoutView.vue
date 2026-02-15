@@ -35,7 +35,7 @@ const form = ref({
   postalCode: '',
   note: ''
 })
- 
+
 // Coupon State
 const couponCode = ref('')
 const couponLoading = ref(false)
@@ -85,13 +85,13 @@ watch(selectedAddressId, (newVal) => {
     }
   }
 })
- 
+
 // محاسبه قیمت نهایی
 const finalPrice = computed(() => {
   const total = cartStore.totalPrice - discountAmount.value
   return total > 0 ? total : 0
 })
- 
+
 const checkCoupon = async () => {
   if (!couponCode.value) return
   
@@ -114,7 +114,7 @@ const checkCoupon = async () => {
     if (discountAmount.value > cartStore.totalPrice) {
       discountAmount.value = cartStore.totalPrice
     }
- 
+
     couponMessageType.value = 'success'
     couponMessage.value = 'کد تخفیف با موفقیت اعمال شد'
     toastStore.showToast('کد تخفیف اعمال شد', 'success')
@@ -127,7 +127,7 @@ const checkCoupon = async () => {
   
   couponLoading.value = false
 }
- 
+
 const removeCoupon = () => {
   appliedCoupon.value = null
   discountAmount.value = 0
@@ -230,7 +230,7 @@ const handlePayment = async () => {
       .insert(orderItems)
  
     if (itemsError) throw itemsError
- 
+
     // افزایش تعداد استفاده از کد تخفیف
     if (appliedCoupon.value) {
       await couponStore.incrementUsage(appliedCoupon.value.id)
@@ -518,7 +518,7 @@ const handlePayment = async () => {
                 <span v-else>ثبت</span>
               </button>
             </div>
- 
+
             <div v-else class="bg-green-50 border border-green-200 rounded-lg p-3 flex justify-between items-center">
               <div>
                 <span class="font-bold text-green-700 text-sm block">{{ appliedCoupon.code }}</span>
@@ -528,12 +528,12 @@ const handlePayment = async () => {
                 <X class="w-4 h-4" />
               </button>
             </div>
- 
+
             <p v-if="couponMessage" class="text-xs mt-2" :class="couponMessageType === 'success' ? 'text-green-600' : 'text-red-500'">
               {{ couponMessage }}
             </p>
           </div>
- 
+
           <h2 class="font-bold text-lg mb-4 text-gray-800">مبلغ قابل پرداخت</h2>
           
           <div class="space-y-3 mb-6">
@@ -546,9 +546,9 @@ const handlePayment = async () => {
               <span>تخفیف</span>
               <span>{{ discountAmount.toLocaleString() }}- <span class="text-xs">تومان</span></span>
             </div>
- 
+
             <div class="border-t border-dashed border-gray-200 my-2"></div>
- 
+
             <div class="flex justify-between items-center">
               <span class="font-bold text-gray-800">مبلغ نهایی</span>
               <span class="font-black text-xl text-primary-700">{{ finalPrice.toLocaleString() }} <span class="text-sm font-normal">تومان</span></span>

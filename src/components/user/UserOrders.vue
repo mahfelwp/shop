@@ -39,7 +39,7 @@ const getStatusText = (status: string) => {
 
 const copyToClipboard = (text: string) => {
   navigator.clipboard.writeText(text)
-  toastStore.showToast('کپی شد!', 'success', 2000)
+  toastStore.showToast('کد رهگیری کپی شد!', 'success', 2000)
 }
 </script>
 
@@ -74,21 +74,24 @@ const copyToClipboard = (text: string) => {
           </div>
         </div>
         
-        <!-- Tracking -->
-        <div v-if="order.status === 'shipped' && order.tracking_code" class="bg-indigo-50 border border-indigo-100 rounded-xl p-4 mb-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <!-- Tracking Section -->
+        <div v-if="order.tracking_code" class="bg-indigo-50 border border-indigo-100 rounded-xl p-4 mb-4 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div class="flex items-center gap-3">
-            <Truck class="w-5 h-5 text-indigo-600" />
+            <div class="bg-white p-2 rounded-lg text-indigo-600 shadow-sm">
+              <Truck class="w-5 h-5" />
+            </div>
             <div>
-              <div class="text-xs text-indigo-600 font-bold mb-1">کد رهگیری پستی:</div>
+              <div class="text-xs text-indigo-600 font-bold mb-1">کد رهگیری مرسوله:</div>
               <div class="font-mono text-lg font-bold text-stone-800 tracking-wider">{{ order.tracking_code }}</div>
             </div>
           </div>
           <div class="flex gap-2 w-full sm:w-auto">
-            <button @click="copyToClipboard(order.tracking_code)" class="flex-1 sm:flex-none bg-white border border-indigo-200 text-indigo-700 px-3 py-2 rounded-lg text-sm hover:bg-indigo-100 transition flex items-center justify-center gap-1">
+            <button @click="copyToClipboard(order.tracking_code)" class="flex-1 sm:flex-none bg-white border border-indigo-200 text-indigo-700 px-3 py-2 rounded-lg text-sm hover:bg-indigo-100 transition flex items-center justify-center gap-1" title="کپی کد">
               <Copy class="w-4 h-4" />
+              <span class="sm:hidden">کپی</span>
             </button>
             <a :href="`https://tracking.post.ir/?id=${order.tracking_code}`" target="_blank" class="flex-1 sm:flex-none bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 transition flex items-center justify-center gap-2">
-              رهگیری
+              رهگیری پست
               <ExternalLink class="w-4 h-4" />
             </a>
           </div>
