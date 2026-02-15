@@ -95,7 +95,13 @@ const updateStatus = async () => {
     selectedOrder.value.shipping_payment_status = statusForm.value.shipping_payment_status
     await adminStore.fetchStats() // Refresh list
   } else {
-    toastStore.showToast('خطا در بروزرسانی', 'error')
+    // نمایش خطای دقیق برای دیباگ
+    console.error('Update Error:', error)
+    if (error.message.includes('column') && error.message.includes('does not exist')) {
+      toastStore.showToast('خطا: ستون‌های جدید در دیتابیس وجود ندارند. لطفا SQL را اجرا کنید.', 'error', 5000)
+    } else {
+      toastStore.showToast('خطا در بروزرسانی: ' + error.message, 'error')
+    }
   }
 }
 
@@ -248,6 +254,10 @@ const copyLink = () => {
 }
 
 const setShippingToPending = () => {
+  if (statusForm.value.shipping_cost_real <= 0) {
+    toastStore.showToast('لطفا مبلغ هزینه ارسال را وارد کنید', 'warning')
+    return
+  }
   statusForm.value.shipping_payment_status = 'pending_payment'
   updateStatus()
 }

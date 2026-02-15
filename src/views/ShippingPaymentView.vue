@@ -128,11 +128,18 @@ const handleSubmit = async () => {
       <div class="p-6 space-y-6">
         <div class="text-center">
           <div class="text-sm text-stone-500 mb-1">مبلغ قابل پرداخت</div>
-          <div class="text-3xl font-black text-stone-800">{{ order.shipping_cost_real.toLocaleString() }} <span class="text-sm font-normal text-stone-500">تومان</span></div>
+          
+          <!-- نمایش شرطی مبلغ -->
+          <div v-if="order.shipping_cost_real > 0" class="text-3xl font-black text-stone-800">
+            {{ order.shipping_cost_real.toLocaleString() }} <span class="text-sm font-normal text-stone-500">تومان</span>
+          </div>
+          <div v-else class="bg-yellow-50 text-yellow-700 p-3 rounded-xl text-sm font-bold border border-yellow-100">
+            در حال محاسبه توسط ادمین...
+          </div>
         </div>
 
         <!-- Payment Method -->
-        <div class="space-y-3">
+        <div v-if="order.shipping_cost_real > 0" class="space-y-3">
           <label class="flex items-center justify-between p-4 border rounded-xl cursor-pointer transition relative overflow-hidden" :class="paymentMethod === 'online' ? 'border-yellow-400 bg-yellow-50 ring-1 ring-yellow-400' : 'border-gray-200 hover:bg-gray-50'">
             <div class="flex items-center gap-3 z-10">
               <input type="radio" v-model="paymentMethod" value="online" class="w-5 h-5 text-yellow-600 focus:ring-yellow-500" />
@@ -153,7 +160,7 @@ const handleSubmit = async () => {
         </div>
 
         <!-- Card Info & Upload -->
-        <div v-if="paymentMethod === 'card_to_card'" class="bg-stone-50 p-4 rounded-xl border border-stone-200 animate-fade-in">
+        <div v-if="order.shipping_cost_real > 0 && paymentMethod === 'card_to_card'" class="bg-stone-50 p-4 rounded-xl border border-stone-200 animate-fade-in">
           <div class="bg-white p-3 rounded-lg border border-stone-200 mb-4 shadow-sm">
             <div class="flex justify-between items-center mb-2"><span class="text-stone-500 text-xs">بانک:</span><span class="font-bold text-sm">{{ settingsStore.settings.bank_name }}</span></div>
             <div class="flex justify-between items-center mb-2"><span class="text-stone-500 text-xs">صاحب حساب:</span><span class="font-bold text-sm">{{ settingsStore.settings.card_owner }}</span></div>
@@ -177,6 +184,7 @@ const handleSubmit = async () => {
         </div>
 
         <button 
+          v-if="order.shipping_cost_real > 0"
           @click="handleSubmit" 
           :disabled="submitting"
           class="w-full py-4 rounded-xl font-bold text-lg transition flex items-center justify-center gap-2 shadow-lg disabled:opacity-70"
@@ -185,6 +193,10 @@ const handleSubmit = async () => {
           <Loader2 v-if="submitting" class="animate-spin w-5 h-5" />
           <span v-else>{{ paymentMethod === 'online' ? 'پرداخت آنلاین' : 'ثبت فیش' }}</span>
         </button>
+        
+        <div v-else class="text-center text-sm text-stone-500">
+          لطفا منتظر بمانید تا ادمین هزینه را محاسبه و وارد کند.
+        </div>
       </div>
     </div>
   </div>
