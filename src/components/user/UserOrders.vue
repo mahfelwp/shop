@@ -114,29 +114,25 @@ const copyToClipboard = (text: string) => {
             </div>
           </div>
  
-          <!-- Timeline (Stepper) -->
-          <div v-if="order.status !== 'cancelled'" class="mb-8 px-2 relative">
-            <!-- Progress Bar Background -->
-            <div class="absolute top-5 left-0 w-full h-1 bg-stone-100 rounded-full -z-0"></div>
-            
-            <!-- Active Progress Bar -->
-            <div 
-              class="absolute top-5 right-0 h-1 bg-green-500 rounded-full -z-0 transition-all duration-1000"
-              :style="{ width: `${(getCurrentStepIndex(order.status) / (orderSteps.length - 1)) * 100}%` }"
-            ></div>
- 
-            <div class="flex justify-between relative z-10">
-              <div v-for="(step, index) in orderSteps" :key="index" class="flex flex-col items-center gap-3 w-20">
+          <!-- Timeline -->
+          <div v-if="order.status !== 'cancelled'" class="mb-6 px-2 py-4">
+            <div class="relative flex items-center justify-between w-full">
+              <div class="absolute left-0 top-1/2 transform -translate-y-1/2 w-full h-1 bg-stone-100 rounded-full -z-0"></div>
+              <div 
+                class="absolute right-0 top-1/2 transform -translate-y-1/2 h-1 bg-green-500 rounded-full -z-0 transition-all duration-1000"
+                :style="{ width: `${(getCurrentStepIndex(order.status) / (orderSteps.length - 1)) * 100}%` }"
+              ></div>
+              <div v-for="(step, index) in orderSteps" :key="index" class="relative z-10 flex flex-col items-center gap-2">
                 <div 
-                  class="w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-300 bg-white"
+                  class="w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center border-2 transition-all duration-300 bg-white"
                   :class="index <= getCurrentStepIndex(order.status) 
-                    ? 'border-green-500 text-white bg-green-500 shadow-md scale-110' 
+                    ? 'border-green-500 text-green-600 shadow-md' 
                     : 'border-stone-200 text-stone-300'"
                 >
-                  <component :is="step.icon" class="w-5 h-5" />
+                  <component :is="step.icon" class="w-4 h-4 md:w-5 md:h-5" :class="index <= getCurrentStepIndex(order.status) ? 'fill-green-100' : ''" />
                 </div>
                 <span 
-                  class="text-[10px] font-bold text-center transition-colors duration-300"
+                  class="text-[10px] md:text-xs font-bold absolute -bottom-6 whitespace-nowrap transition-colors duration-300"
                   :class="index <= getCurrentStepIndex(order.status) ? 'text-stone-800' : 'text-stone-300'"
                 >
                   {{ step.label }}
