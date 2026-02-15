@@ -18,7 +18,8 @@ onMounted(() => {
 })
 
 const toggleOrderDetails = (orderId: number) => {
-  if (expandedOrders.has(orderId)) {
+  // اصلاح خطا: استفاده از .value برای دسترسی به متدهای Set درون ref
+  if (expandedOrders.value.has(orderId)) {
     expandedOrders.value.delete(orderId)
   } else {
     expandedOrders.value.add(orderId)
