@@ -6,7 +6,7 @@ import { useSettingsStore } from '@/stores/settings'
 import { useToastStore } from '@/stores/toast'
 import { useRouter } from 'vue-router'
 import { supabase } from '@/lib/supabase'
-import { CreditCard, MapPin, Truck, Loader2, Upload, AlertCircle, Copy, Plus, Home, Briefcase, FileText } from 'lucide-vue-next'
+import { CreditCard, MapPin, Truck, Loader2, Upload, AlertCircle, Copy, Plus, Home, Briefcase, FileText, X } from 'lucide-vue-next'
  
 const cartStore = useCartStore()
 const authStore = useAuthStore()
@@ -32,6 +32,13 @@ const form = ref({
 })
  
 onMounted(async () => {
+  // اگر سبد خرید خالی است، برگرد به صفحه سبد خرید
+  if (cartStore.totalItems === 0) {
+    toastStore.showToast('سبد خرید شما خالی است', 'warning')
+    router.push('/cart')
+    return
+  }
+ 
   settingsStore.fetchSettings()
   
   // Fetch Saved Addresses
@@ -71,6 +78,14 @@ const handleFileUpload = (event: Event) => {
     receiptFile.value = target.files[0]
     receiptPreview.value = URL.createObjectURL(target.files[0])
   }
+}
+ 
+const removeReceipt = () => {
+  receiptFile.value = null
+  receiptPreview.value = null
+  // Reset input value to allow re-selecting same file if needed
+  const input = document.getElementById('receipt-input') as HTMLInputElement
+  if (input) input.value = ''
 }
  
 const copyToClipboard = (text: string) => {
@@ -324,17 +339,32 @@ const handlePayment = async () => {
                   <Upload class="w-4 h-4" />
                   آپلود فیش واریزی
                 </h3>
-                <div class="border-2 border-dashed border-stone-300 rounded-xl p-6 text-center hover:bg-white transition cursor-pointer relative">
-                  <input type="file" accept="image/*" @change="handleFileUpload" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                
+                <!-- Upload Box -->
+                <div class="border-2 border-dashed border-stone-300 rounded-xl p-6 text-center hover:bg-white transition cursor-pointer relative group">
+                  <input id="receipt-input" type="file" accept="image/*" @change="handleFileUpload" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
+                  
                   <div v-if="!receiptPreview" class="flex flex-col items-center gap-2 text-stone-500">
                     <Upload class="w-8 h-8 text-stone-400" />
                     <span class="text-sm">برای انتخاب تصویر کلیک کنید</span>
                   </div>
-                  <div v-else class="relative">
+                  
+                  <div v-else class="relative z-20">
                     <img :src="receiptPreview" class="max-h-40 mx-auto rounded-lg shadow-md" />
-                    <span class="block mt-2 text-xs text-green-600 font-bold">تصویر انتخاب شد</span>
+                    
+                    <!-- Remove Button -->
+                    <button 
+                      @click.stop="removeReceipt" 
+                      class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1.5 shadow-md hover:bg-red-600 transition z-30"
+                      title="حذف تصویر"
+                    >
+                      <X class="w-4 h-4" />
+                    </button>
+                    
+                    <span class="block mt-2 text-xs text-green-600 font-bold">تصویر انتخاب شد (برای تغییر کلیک کنید)</span>
                   </div>
                 </div>
+ 
                 <div class="flex items-start gap-2 mt-3 text-xs text-amber-600 bg-amber-50 p-2 rounded">
                   <AlertCircle class="w-4 h-4 shrink-0" />
                   <p>سفارش شما پس از بررسی فیش واریزی توسط مدیریت تایید و ارسال خواهد شد.</p>
