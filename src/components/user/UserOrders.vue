@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { Package, Truck, Copy, ExternalLink, CheckCircle2, ClipboardList, XCircle, Clock, ChevronDown, ChevronUp, ShoppingBag } from 'lucide-vue-next'
+import { Package, Truck, CheckCircle2, ClipboardList, XCircle, Clock, ChevronDown, ChevronUp, ShoppingBag, CreditCard, Wallet, Receipt } from 'lucide-vue-next'
 import { useToastStore } from '@/stores/toast'
  
 const props = defineProps<{
@@ -91,47 +91,52 @@ const copyToClipboard = (text: string) => {
         
         <!-- Order Header (Always Visible) -->
         <div class="p-6">
-          <div class="flex flex-wrap justify-between items-center gap-4 mb-6">
-            <div class="flex items-center gap-3">
-              <div class="w-12 h-12 bg-stone-50 rounded-xl flex items-center justify-center font-mono font-bold text-stone-600 border border-stone-100">
+          <div class="flex flex-wrap justify-between items-start gap-4 mb-8">
+            <div class="flex items-center gap-4">
+              <div class="w-14 h-14 bg-stone-50 rounded-2xl flex items-center justify-center font-mono font-bold text-stone-500 border border-stone-100 text-lg">
                 #{{ order.id }}
               </div>
               <div>
-                <div class="font-bold text-stone-800 text-lg">سفارش {{ formatDate(order.created_at) }}</div>
-                <div class="text-xs text-stone-500 mt-1 flex items-center gap-2">
+                <div class="font-bold text-stone-800 text-lg mb-1">سفارش {{ formatDate(order.created_at) }}</div>
+                <div class="text-xs text-stone-500 flex items-center gap-2">
                   <span>{{ order.order_items.length }} قلم کالا</span>
-                  <span class="w-1 h-1 bg-stone-300 rounded-full"></span>
-                  <span>{{ order.payment_method === 'online' ? 'پرداخت آنلاین' : 'کارت به کارت' }}</span>
                 </div>
               </div>
             </div>
-            <span class="px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5" :class="getStatusColor(order.status)">
-              <span v-if="order.status === 'cancelled'"><XCircle class="w-3.5 h-3.5" /></span>
-              <span v-else-if="order.status === 'pending_approval'"><Clock class="w-3.5 h-3.5" /></span>
-              <span v-else><CheckCircle2 class="w-3.5 h-3.5" /></span>
-              {{ getStatusText(order.status) }}
-            </span>
+            
+            <div class="flex flex-col items-end gap-2">
+              <span class="px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5" :class="getStatusColor(order.status)">
+                <span v-if="order.status === 'cancelled'"><XCircle class="w-3.5 h-3.5" /></span>
+                <span v-else-if="order.status === 'pending_approval'"><Clock class="w-3.5 h-3.5" /></span>
+                <span v-else><CheckCircle2 class="w-3.5 h-3.5" /></span>
+                {{ getStatusText(order.status) }}
+              </span>
+            </div>
           </div>
  
-          <!-- Timeline -->
-          <div v-if="order.status !== 'cancelled'" class="mb-6 px-2 py-4">
-            <div class="relative flex items-center justify-between w-full">
-              <div class="absolute left-0 top-1/2 transform -translate-y-1/2 w-full h-1 bg-stone-100 rounded-full -z-0"></div>
-              <div 
-                class="absolute right-0 top-1/2 transform -translate-y-1/2 h-1 bg-green-500 rounded-full -z-0 transition-all duration-1000"
-                :style="{ width: `${(getCurrentStepIndex(order.status) / (orderSteps.length - 1)) * 100}%` }"
-              ></div>
-              <div v-for="(step, index) in orderSteps" :key="index" class="relative z-10 flex flex-col items-center gap-2">
+          <!-- Timeline (Stepper) -->
+          <div v-if="order.status !== 'cancelled'" class="mb-8 px-2 relative">
+            <!-- Progress Bar Background -->
+            <div class="absolute top-5 left-0 w-full h-1 bg-stone-100 rounded-full -z-0"></div>
+            
+            <!-- Active Progress Bar -->
+            <div 
+              class="absolute top-5 right-0 h-1 bg-green-500 rounded-full -z-0 transition-all duration-1000"
+              :style="{ width: `${(getCurrentStepIndex(order.status) / (orderSteps.length - 1)) * 100}%` }"
+            ></div>
+ 
+            <div class="flex justify-between relative z-10">
+              <div v-for="(step, index) in orderSteps" :key="index" class="flex flex-col items-center gap-3 w-20">
                 <div 
-                  class="w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center border-2 transition-all duration-300 bg-white"
+                  class="w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-300 bg-white"
                   :class="index <= getCurrentStepIndex(order.status) 
-                    ? 'border-green-500 text-green-600 shadow-md' 
+                    ? 'border-green-500 text-white bg-green-500 shadow-md scale-110' 
                     : 'border-stone-200 text-stone-300'"
                 >
-                  <component :is="step.icon" class="w-4 h-4 md:w-5 md:h-5" :class="index <= getCurrentStepIndex(order.status) ? 'fill-green-100' : ''" />
+                  <component :is="step.icon" class="w-5 h-5" />
                 </div>
                 <span 
-                  class="text-[10px] md:text-xs font-bold absolute -bottom-6 whitespace-nowrap transition-colors duration-300"
+                  class="text-[10px] font-bold text-center transition-colors duration-300"
                   :class="index <= getCurrentStepIndex(order.status) ? 'text-stone-800' : 'text-stone-300'"
                 >
                   {{ step.label }}
@@ -146,22 +151,22 @@ const copyToClipboard = (text: string) => {
             <span class="text-sm font-bold">این سفارش لغو شده است.</span>
           </div>
           
-          <!-- Tracking Code -->
-          <div v-if="order.tracking_code" class="bg-indigo-50 border border-indigo-100 rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 mt-8">
+          <!-- Tracking Code Box -->
+          <div v-if="order.tracking_code" class="bg-indigo-50 border border-indigo-100 rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 animate-fade-in">
             <div class="flex items-center gap-3 w-full sm:w-auto">
-              <div class="bg-white p-2 rounded-lg text-indigo-600 shadow-sm">
-                <Truck class="w-5 h-5" />
+              <div class="bg-white p-2.5 rounded-xl text-indigo-600 shadow-sm">
+                <Truck class="w-6 h-6" />
               </div>
               <div>
-                <div class="text-xs text-indigo-600 font-bold mb-0.5">کد رهگیری مرسوله</div>
-                <div class="font-mono text-base font-bold text-stone-800 tracking-wider select-all">{{ order.tracking_code }}</div>
+                <div class="text-xs text-indigo-600 font-bold mb-1">کد رهگیری مرسوله پستی</div>
+                <div class="font-mono text-lg font-bold text-stone-800 tracking-widest select-all">{{ order.tracking_code }}</div>
               </div>
             </div>
             <div class="flex gap-2 w-full sm:w-auto text-xs font-bold">
-              <button @click="copyToClipboard(order.tracking_code)" class="flex-1 sm:flex-none bg-white text-indigo-700 px-3 py-2 rounded-lg hover:bg-indigo-50 transition border border-indigo-200">
+              <button @click="copyToClipboard(order.tracking_code)" class="flex-1 sm:flex-none bg-white text-indigo-700 px-4 py-2.5 rounded-xl hover:bg-indigo-50 transition border border-indigo-200 shadow-sm">
                 کپی کد
               </button>
-              <a :href="`https://tracking.post.ir/?id=${order.tracking_code}`" target="_blank" class="flex-1 sm:flex-none bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition shadow-sm">
+              <a :href="`https://tracking.post.ir/?id=${order.tracking_code}`" target="_blank" class="flex-1 sm:flex-none bg-indigo-600 text-white px-6 py-2.5 rounded-xl hover:bg-indigo-700 transition shadow-md shadow-indigo-200">
                 رهگیری در پست
               </a>
             </div>
@@ -170,41 +175,115 @@ const copyToClipboard = (text: string) => {
  
         <!-- Footer & Expandable Details -->
         <div class="bg-stone-50 border-t border-stone-100">
-          <!-- Summary Bar -->
-          <div class="p-4 flex items-center justify-between cursor-pointer hover:bg-stone-100 transition" @click="toggleOrderDetails(order.id)">
+          <!-- Summary Bar (Clickable) -->
+          <div class="p-4 flex items-center justify-between cursor-pointer hover:bg-stone-100 transition select-none" @click="toggleOrderDetails(order.id)">
             <div class="flex items-center gap-2">
-              <span class="text-sm text-stone-500">مبلغ کل:</span>
+              <span class="text-sm text-stone-500">مبلغ کل سفارش:</span>
               <span class="font-black text-lg text-stone-900">{{ order.total_price.toLocaleString() }} <span class="text-xs font-normal text-stone-500">تومان</span></span>
             </div>
-            <button class="flex items-center gap-1 text-sm font-bold text-stone-600">
-              {{ expandedOrders.has(order.id) ? 'بستن جزئیات' : 'مشاهده اقلام' }}
+            <button class="flex items-center gap-2 text-sm font-bold text-stone-600 bg-white px-4 py-2 rounded-lg border border-stone-200 shadow-sm">
+              {{ expandedOrders.has(order.id) ? 'بستن جزئیات' : 'مشاهده اقلام و فاکتور' }}
               <component :is="expandedOrders.has(order.id) ? ChevronUp : ChevronDown" class="w-4 h-4" />
             </button>
           </div>
  
-          <!-- Expanded Items List -->
-          <div v-if="expandedOrders.has(order.id)" class="border-t border-stone-200 bg-white p-4 animate-fade-in">
-            <div class="space-y-3">
-              <div v-for="item in order.order_items" :key="item.id" class="flex items-center gap-4 p-3 border border-stone-100 rounded-xl hover:border-stone-200 transition">
-                <div class="w-16 h-16 bg-stone-50 rounded-lg overflow-hidden border border-stone-100 shrink-0">
+          <!-- Expanded Content -->
+          <div v-if="expandedOrders.has(order.id)" class="border-t border-stone-200 bg-white p-6 animate-fade-in">
+            
+            <h4 class="font-bold text-stone-800 mb-4 flex items-center gap-2">
+              <ShoppingBag class="w-5 h-5 text-stone-400" />
+              اقلام سفارش
+            </h4>
+ 
+            <!-- Items List -->
+            <div class="grid md:grid-cols-2 gap-4 mb-8">
+              <div v-for="item in order.order_items" :key="item.id" class="flex gap-4 p-3 border border-stone-100 rounded-xl hover:border-stone-200 transition bg-stone-50/50">
+                <div class="w-20 h-20 bg-white rounded-lg overflow-hidden border border-stone-200 shrink-0">
                   <img v-if="item.products?.image" :src="item.products.image" class="w-full h-full object-cover" />
                   <div v-else class="w-full h-full flex items-center justify-center text-stone-300"><ShoppingBag class="w-6 h-6" /></div>
                 </div>
-                <div class="flex-grow">
-                  <h4 class="font-bold text-stone-800 text-sm mb-1">{{ item.products?.title || 'محصول حذف شده' }}</h4>
-                  <div class="text-xs text-stone-500">{{ item.products?.category }}</div>
-                </div>
-                <div class="text-left">
-                  <div class="font-bold text-stone-800 text-sm">{{ item.price_at_purchase.toLocaleString() }} ت</div>
-                  <div class="text-xs text-stone-500 mt-1">تعداد: {{ item.quantity }}</div>
+                <div class="flex-grow flex flex-col justify-between py-1">
+                  <div>
+                    <h4 class="font-bold text-stone-800 text-sm mb-1 line-clamp-1">{{ item.products?.title || 'محصول حذف شده' }}</h4>
+                    <div class="text-xs text-stone-500">{{ item.products?.category }}</div>
+                  </div>
+                  <div class="flex justify-between items-end">
+                    <div class="text-xs font-bold bg-white px-2 py-1 rounded border border-stone-200 text-stone-600">
+                      {{ item.quantity }} عدد
+                    </div>
+                    <div class="font-bold text-stone-800 text-sm">
+                      {{ item.price_at_purchase.toLocaleString() }} <span class="text-[10px] font-normal text-stone-500">تومان</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
-            
-            <div v-if="order.note" class="mt-4 p-3 bg-yellow-50 border border-yellow-100 rounded-lg text-xs text-yellow-800">
-              <span class="font-bold block mb-1">یادداشت شما:</span>
-              {{ order.note }}
+ 
+            <!-- Payment & Financial Details -->
+            <div class="grid md:grid-cols-2 gap-6 pt-6 border-t border-stone-100">
+              
+              <!-- Left: Payment Info & Note -->
+              <div class="space-y-4">
+                <div class="bg-stone-50 p-4 rounded-xl border border-stone-100">
+                  <h5 class="font-bold text-sm text-stone-700 mb-3 flex items-center gap-2">
+                    <Wallet class="w-4 h-4" />
+                    اطلاعات پرداخت
+                  </h5>
+                  <div class="space-y-2 text-sm">
+                    <div class="flex justify-between">
+                      <span class="text-stone-500">روش پرداخت:</span>
+                      <span class="font-bold text-stone-800 flex items-center gap-1">
+                        <CreditCard v-if="order.payment_method === 'online'" class="w-3 h-3 text-blue-600" />
+                        <Receipt v-else class="w-3 h-3 text-orange-600" />
+                        {{ order.payment_method === 'online' ? 'درگاه اینترنتی' : 'کارت به کارت' }}
+                      </span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-stone-500">تاریخ ثبت:</span>
+                      <span class="font-mono text-stone-800">{{ new Date(order.created_at).toLocaleTimeString('fa-IR', {hour: '2-digit', minute:'2-digit'}) }} - {{ formatDate(order.created_at) }}</span>
+                    </div>
+                  </div>
+                </div>
+ 
+                <div v-if="order.note" class="p-3 bg-yellow-50 border border-yellow-100 rounded-xl text-xs text-yellow-800 leading-relaxed">
+                  <span class="font-bold block mb-1">یادداشت شما:</span>
+                  {{ order.note }}
+                </div>
+              </div>
+ 
+              <!-- Right: Financial Summary -->
+              <div class="bg-stone-50 p-4 rounded-xl border border-stone-100">
+                <h5 class="font-bold text-sm text-stone-700 mb-3 flex items-center gap-2">
+                  <Receipt class="w-4 h-4" />
+                  جزئیات صورتحساب
+                </h5>
+                <div class="space-y-3 text-sm">
+                  <div class="flex justify-between text-stone-600">
+                    <span>جمع کل اقلام:</span>
+                    <span>{{ (order.total_price + (order.discount_amount || 0)).toLocaleString() }} تومان</span>
+                  </div>
+                  
+                  <div v-if="order.discount_amount > 0" class="flex justify-between text-red-500 font-medium">
+                    <span>سود شما از خرید (تخفیف):</span>
+                    <span>{{ order.discount_amount.toLocaleString() }}- تومان</span>
+                  </div>
+ 
+                  <div class="flex justify-between text-stone-600">
+                    <span>هزینه ارسال:</span>
+                    <span class="text-green-600 font-bold">رایگان</span>
+                  </div>
+ 
+                  <div class="border-t border-stone-200 my-2"></div>
+ 
+                  <div class="flex justify-between items-center">
+                    <span class="font-bold text-stone-800">مبلغ نهایی پرداخت شده:</span>
+                    <span class="font-black text-lg text-stone-900">{{ order.total_price.toLocaleString() }} <span class="text-xs font-normal text-stone-500">تومان</span></span>
+                  </div>
+                </div>
+              </div>
+ 
             </div>
+            
           </div>
         </div>
  
