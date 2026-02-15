@@ -4,12 +4,21 @@ import App from './App.vue'
 import { routes, setupGuards } from './router'
 import './style.css'
 
-// استفاده از ViteSSG به جای createApp معمولی
+// --- FIX: جلوگیری از کرش کردن برنامه با خطاهای هندل نشده ---
+if (typeof window !== 'undefined') {
+  window.addEventListener('unhandledrejection', (event) => {
+    // اگر خطا AbortError بود، آن را نادیده بگیر تا کنسول قرمز نشود و برنامه متوقف نشود
+    if (event.reason && (event.reason.name === 'AbortError' || event.reason.message?.includes('aborted'))) {
+      event.preventDefault()
+      console.debug('Suppressed AbortError in main.ts')
+    }
+  })
+}
+
 export const createApp = ViteSSG(
   App,
   { 
     routes,
-    // تنظیم رفتار اسکرول برای تجربه کاربری بهتر
     scrollBehavior(to, from, savedPosition) {
       if (savedPosition) return savedPosition
       return { top: 0 }
@@ -19,14 +28,11 @@ export const createApp = ViteSSG(
     const pinia = createPinia()
     app.use(pinia)
     
-    // گاردهای روتر فقط در سمت کلاینت اجرا می‌شوند
     if (isClient) {
       setupGuards(router)
       
-      // رفع باگ Hydration Mismatch برای صفحات ادمین
-      // اگر در مسیر ادمین هستیم، صبر می‌کنیم تا روتر کاملا آماده شود
       router.isReady().then(() => {
-        // لاجیک‌های اضافی کلاینت ساید اگر نیاز بود
+        console.log('Router is ready')
       })
     }
   }

@@ -5,7 +5,7 @@ import ProductListView from '../views/ProductListView.vue'
 import CartView from '../views/CartView.vue'
 import CheckoutView from '../views/CheckoutView.vue'
 import PaymentResultView from '../views/PaymentResultView.vue'
-import ShippingPaymentView from '../views/ShippingPaymentView.vue' // New View
+import ShippingPaymentView from '../views/ShippingPaymentView.vue'
 import UserProfile from '../views/user/UserProfile.vue'
 import { useAuthStore } from '@/stores/auth'
  
@@ -31,10 +31,8 @@ export const routes: RouteRecordRaw[] = [
   { path: '/checkout', name: 'checkout', component: CheckoutView, meta: { requiresAuth: true } },
   { path: '/payment-result', name: 'payment-result', component: PaymentResultView },
   
-  // New Route for Shipping Payment
   { path: '/pay-shipping/:token', name: 'pay-shipping', component: ShippingPaymentView, meta: { hideLayout: true } },
   
-  // پنل ادمین
   { 
     path: '/admin', 
     component: AdminDashboard,
@@ -42,24 +40,15 @@ export const routes: RouteRecordRaw[] = [
     children: [
       { path: '', redirect: { name: 'admin-dashboard' } },
       { path: 'dashboard', name: 'admin-dashboard', component: DashboardHome, meta: { title: 'داشبورد مدیریتی' } },
-      
-      // Products Routes
       { path: 'products', name: 'admin-products', component: AdminProductManager, meta: { title: 'مدیریت محصولات' } },
       { path: 'products/create', name: 'admin-product-create', component: AdminProductForm, meta: { title: 'افزودن محصول جدید' } },
       { path: 'products/edit/:id', name: 'admin-product-edit', component: AdminProductForm, meta: { title: 'ویرایش محصول' } },
-      
-      // Categories Route
       { path: 'categories', name: 'admin-categories', component: AdminCategoryManager, meta: { title: 'مدیریت دسته‌بندی‌ها' } },
- 
       { path: 'orders', name: 'admin-orders', component: AdminOrderManager, meta: { title: 'مدیریت سفارشات' } },
       { path: 'inventory', name: 'admin-inventory', component: AdminInventory, meta: { title: 'مدیریت موجودی انبار' } },
       { path: 'users', name: 'admin-users', component: AdminCustomerList, meta: { title: 'لیست مشتریان' } },
       { path: 'analytics', name: 'admin-analytics', component: AdminAnalytics, meta: { title: 'آمار و گزارشات' } },
-      
-      // Coupons Route (New)
       { path: 'coupons', name: 'admin-coupons', component: AdminCouponManager, meta: { title: 'مدیریت کدهای تخفیف' } },
-      
-      // Settings Route
       { path: 'settings', name: 'admin-settings', component: AdminSettings, meta: { title: 'تنظیمات سیستم' } }
     ]
   },
@@ -79,10 +68,32 @@ export const routes: RouteRecordRaw[] = [
   }
 ]
  
-export const createRouterInstance = () => createRouter({
-  history: createWebHistory(import.meta.env.BASE_URL),
-  routes
-})
+export const createRouterInstance = () => {
+  const router = createRouter({
+    history: createWebHistory(import.meta.env.BASE_URL),
+    routes
+  })
+
+  // --- FIX: مدیریت خطاهای ناگهانی روتر ---
+  router.onError((error) => {
+    const targetPath = router.currentRoute.value.fullPath
+    
+    // 1. اگر خطا مربوط به لود نشدن فایل‌های JS/CSS باشد (ورژن جدید دیپلوی شده)
+    if (error.message.includes('Failed to fetch') || error.message.includes('Importing a module script failed')) {
+      if (!targetPath) return
+      // صفحه را ریلود کن تا فایل‌های جدید را بگیرد
+      window.location.reload()
+    }
+    
+    // 2. نادیده گرفتن خطای AbortError که باعث فریز شدن می‌شود
+    if (error.name === 'AbortError' || error.message.includes('aborted')) {
+      console.warn('Navigation aborted (benign error):', error)
+      return // جلوگیری از پرتاب خطا به بالا
+    }
+  })
+
+  return router
+}
  
 export const setupGuards = (router: any) => {
   router.beforeEach(async (to: any, from: any, next: any) => {
