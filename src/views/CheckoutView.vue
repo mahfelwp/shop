@@ -6,31 +6,31 @@ import { useSettingsStore } from '@/stores/settings'
 import { useToastStore } from '@/stores/toast'
 import { useRouter } from 'vue-router'
 import { supabase } from '@/lib/supabase'
-import { CreditCard, MapPin, Truck, Loader2, Upload, AlertCircle, Copy, Plus, Home, Briefcase } from 'lucide-vue-next'
-
+import { CreditCard, MapPin, Truck, Loader2, Upload, AlertCircle, Copy, Plus, Home, Briefcase, FileText } from 'lucide-vue-next'
+ 
 const cartStore = useCartStore()
 const authStore = useAuthStore()
 const settingsStore = useSettingsStore()
 const toastStore = useToastStore()
 const router = useRouter()
 const loading = ref(false)
-
+ 
 const paymentMethod = ref<'online' | 'card_to_card'>('online')
 const receiptFile = ref<File | null>(null)
 const receiptPreview = ref<string | null>(null)
-
+ 
 // Address Management
 const savedAddresses = ref<any[]>([])
 const selectedAddressId = ref<number | 'new'>('new')
-
+ 
 const form = ref({
   fullName: authStore.profile?.full_name || '',
   phone: authStore.profile?.phone || '',
   address: '',
   postalCode: '',
-  note: ''
+  note: '' // فیلد جدید برای توضیحات سفارش
 })
-
+ 
 onMounted(async () => {
   settingsStore.fetchSettings()
   
@@ -48,7 +48,7 @@ onMounted(async () => {
     }
   }
 })
-
+ 
 // Watch for address selection change
 watch(selectedAddressId, (newVal) => {
   if (newVal === 'new') {
@@ -64,7 +64,7 @@ watch(selectedAddressId, (newVal) => {
     }
   }
 })
-
+ 
 const handleFileUpload = (event: Event) => {
   const target = event.target as HTMLInputElement
   if (target.files && target.files[0]) {
@@ -72,36 +72,36 @@ const handleFileUpload = (event: Event) => {
     receiptPreview.value = URL.createObjectURL(target.files[0])
   }
 }
-
+ 
 const copyToClipboard = (text: string) => {
   navigator.clipboard.writeText(text)
   toastStore.showToast('شماره کارت کپی شد', 'success', 2000)
 }
-
+ 
 const handlePayment = async () => {
   if (!authStore.user) {
     router.push('/login')
     return
   }
-
+ 
   if (!form.value.fullName || !form.value.address || !form.value.phone) {
     toastStore.showToast('لطفا اطلاعات ارسال را کامل کنید', 'warning')
     return
   }
-
+ 
   if (paymentMethod.value === 'card_to_card' && !receiptFile.value) {
     toastStore.showToast('لطفا تصویر فیش واریزی را آپلود کنید', 'warning')
     return
   }
-
+ 
   loading.value = true
   
   try {
     let receiptUrl = null
-
+ 
     // 1. Upload Receipt if Card to Card
     if (paymentMethod.value === 'card_to_card' && receiptFile.value) {
-      const fileName = `${authStore.user.id}_${Date.now()}_${receiptFile.value.name}`
+      const fileName = `${authStore.user.id}_${Date.now()}_${receiptFile.value.name.replace(/[^a-zA-Z0-9.]/g, '')}`
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('receipts')
         .upload(fileName, receiptFile.value)
@@ -112,7 +112,7 @@ const handlePayment = async () => {
       const { data: publicUrlData } = supabase.storage.from('receipts').getPublicUrl(fileName)
       receiptUrl = publicUrlData.publicUrl
     }
-
+ 
     // 2. Create Order
     const status = paymentMethod.value === 'online' ? 'pending' : 'pending_approval'
     
@@ -126,13 +126,14 @@ const handlePayment = async () => {
         receiver_name: form.value.fullName,
         receiver_phone: form.value.phone,
         payment_method: paymentMethod.value,
-        payment_receipt_url: receiptUrl
+        payment_receipt_url: receiptUrl,
+        note: form.value.note // ارسال توضیحات به دیتابیس
       })
       .select()
       .single()
-
+ 
     if (orderError) throw orderError
-
+ 
     // 3. Create Order Items
     const orderItems = cartStore.items.map(item => ({
       order_id: orderData.id,
@@ -140,13 +141,13 @@ const handlePayment = async () => {
       quantity: item.quantity,
       price_at_purchase: item.price
     }))
-
+ 
     const { error: itemsError } = await supabase
       .from('order_items')
       .insert(orderItems)
-
+ 
     if (itemsError) throw itemsError
-
+ 
     // 4. Handle Payment Redirect
     if (paymentMethod.value === 'online') {
       console.log('Redirecting to ZarinPal with Merchant:', settingsStore.settings.zarinpal_merchant)
@@ -164,7 +165,7 @@ const handlePayment = async () => {
         query: { status: 'success', orderId: orderData.id.toString(), method: 'card_to_card' } 
       })
     }
-
+ 
   } catch (error: any) {
     console.error('Error creating order:', error)
     toastStore.showToast('خطا در ثبت سفارش: ' + error.message, 'error')
@@ -175,11 +176,11 @@ const handlePayment = async () => {
   }
 }
 </script>
-
+ 
 <template>
   <div class="container mx-auto px-4 py-8 pt-32">
     <h1 class="text-2xl font-bold text-gray-800 mb-8">تسویه حساب و پرداخت</h1>
-
+ 
     <div class="grid lg:grid-cols-3 gap-8">
       <!-- Shipping Info Form -->
       <div class="lg:col-span-2 space-y-6">
@@ -190,7 +191,7 @@ const handlePayment = async () => {
             <MapPin class="w-6 h-6" />
             <h2 class="font-bold text-lg">آدرس تحویل سفارش</h2>
           </div>
-
+ 
           <!-- Saved Addresses Selection -->
           <div v-if="savedAddresses.length > 0" class="mb-6 grid gap-3">
             <label 
@@ -208,7 +209,7 @@ const handlePayment = async () => {
                 <p class="text-sm text-stone-600 leading-relaxed">{{ addr.address }}</p>
               </div>
             </label>
-
+ 
             <!-- New Address Option -->
             <label 
               class="flex items-center gap-3 p-4 border rounded-xl cursor-pointer transition border-dashed"
@@ -242,7 +243,24 @@ const handlePayment = async () => {
             </div>
           </div>
         </div>
-
+ 
+        <!-- Additional Info (Note) Section -->
+        <div class="bg-white p-6 rounded-2xl border border-primary-100">
+          <div class="flex items-center gap-2 mb-4 text-primary-700">
+            <FileText class="w-6 h-6" />
+            <h2 class="font-bold text-lg">توضیحات سفارش (اختیاری)</h2>
+          </div>
+          <p class="text-sm text-stone-500 mb-3">
+            اگر نکته‌ای برای تحویل سفارش دارید (مانند زمان تحویل، نیاز به فاکتور رسمی و ...) اینجا بنویسید.
+          </p>
+          <textarea 
+            v-model="form.note" 
+            rows="3" 
+            placeholder="مثلا: لطفا قبل از ارسال تماس بگیرید..."
+            class="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-stone-900 outline-none transition"
+          ></textarea>
+        </div>
+ 
         <!-- Payment Method -->
         <div class="bg-white p-6 rounded-2xl border border-primary-100">
           <div class="flex items-center gap-2 mb-4 text-primary-700">
@@ -262,7 +280,7 @@ const handlePayment = async () => {
               </div>
               <div class="bg-white px-2 py-1 rounded text-xs font-bold text-blue-800 border border-blue-200 z-10">ZarinPal</div>
             </label>
-
+ 
             <!-- Card to Card Option -->
             <label class="flex items-center justify-between p-4 border rounded-xl cursor-pointer transition relative overflow-hidden" :class="paymentMethod === 'card_to_card' ? 'border-blue-400 bg-blue-50 ring-1 ring-blue-400' : 'border-gray-200 hover:bg-gray-50'">
               <div class="flex items-center gap-3 z-10">
@@ -273,7 +291,7 @@ const handlePayment = async () => {
                 </div>
               </div>
             </label>
-
+ 
             <!-- Card Details & Upload Section -->
             <div v-if="paymentMethod === 'card_to_card'" class="mt-4 p-5 bg-stone-50 rounded-xl border border-stone-200 animate-fade-in">
               <div class="mb-6">
@@ -300,7 +318,7 @@ const handlePayment = async () => {
                   </div>
                 </div>
               </div>
-
+ 
               <div>
                 <h3 class="font-bold text-stone-800 mb-3 text-sm flex items-center gap-2">
                   <Upload class="w-4 h-4" />
@@ -325,9 +343,9 @@ const handlePayment = async () => {
             </div>
           </div>
         </div>
-
+ 
       </div>
-
+ 
       <!-- Summary & Pay Button -->
       <div class="lg:col-span-1">
         <div class="bg-white p-6 rounded-2xl border border-primary-100 sticky top-32">
@@ -337,7 +355,7 @@ const handlePayment = async () => {
             <span class="text-gray-600">جمع کل خرید</span>
             <span class="font-bold text-xl text-primary-700">{{ cartStore.totalPrice.toLocaleString() }} <span class="text-sm font-normal">تومان</span></span>
           </div>
-
+ 
           <button 
             @click="handlePayment"
             :disabled="loading"
