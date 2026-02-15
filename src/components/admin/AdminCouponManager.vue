@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useCouponStore } from '@/stores/coupon'
 import { useToastStore } from '@/stores/toast'
-import { TicketPercent, Plus, Trash2, Loader2, Calendar, Hash, DollarSign, Percent } from 'lucide-vue-next'
+import { BadgePercent, Plus, Trash2, Loader2, Calendar, Hash, DollarSign, Percent } from 'lucide-vue-next'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
  
 const couponStore = useCouponStore()
@@ -209,7 +209,7 @@ const formatDate = (dateString: string | null) => {
       <div class="bg-white rounded-2xl shadow-sm border border-stone-100 overflow-hidden">
         <div class="p-6 border-b border-stone-100 flex justify-between items-center">
           <span class="font-bold text-lg flex items-center gap-2">
-            <TicketPercent class="w-5 h-5 text-stone-400" />
+            <BadgePercent class="w-5 h-5 text-stone-400" />
             لیست کدهای فعال
           </span>
           <button @click="couponStore.fetchCoupons" class="text-sm text-indigo-600 hover:underline">بروزرسانی</button>
