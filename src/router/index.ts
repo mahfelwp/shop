@@ -7,7 +7,7 @@ import CheckoutView from '../views/CheckoutView.vue'
 import PaymentResultView from '../views/PaymentResultView.vue'
 import UserProfile from '../views/user/UserProfile.vue'
 import { useAuthStore } from '@/stores/auth'
-
+ 
 // Admin Components
 import AdminDashboard from '../views/admin/AdminDashboard.vue'
 import DashboardHome from '../components/admin/DashboardHome.vue'
@@ -20,7 +20,8 @@ import AdminCustomerList from '../components/admin/AdminCustomerList.vue'
 import AdminAnalytics from '../components/admin/AdminAnalytics.vue'
 import AdminSettings from '../views/admin/AdminSettings.vue'
 import AdminSetup from '../views/admin/AdminSetup.vue'
-
+import AdminCouponManager from '../components/admin/AdminCouponManager.vue'
+ 
 // اکسپورت کردن routes به صورت جداگانه برای استفاده در main.ts و vite-ssg
 export const routes: RouteRecordRaw[] = [
   { path: '/', name: 'home', component: HomeView },
@@ -46,11 +47,14 @@ export const routes: RouteRecordRaw[] = [
       
       // Categories Route
       { path: 'categories', name: 'admin-categories', component: AdminCategoryManager, meta: { title: 'مدیریت دسته‌بندی‌ها' } },
-
+ 
       { path: 'orders', name: 'admin-orders', component: AdminOrderManager, meta: { title: 'مدیریت سفارشات' } },
       { path: 'inventory', name: 'admin-inventory', component: AdminInventory, meta: { title: 'مدیریت موجودی انبار' } },
       { path: 'users', name: 'admin-users', component: AdminCustomerList, meta: { title: 'لیست مشتریان' } },
       { path: 'analytics', name: 'admin-analytics', component: AdminAnalytics, meta: { title: 'آمار و گزارشات' } },
+      
+      // Coupons Route (New)
+      { path: 'coupons', name: 'admin-coupons', component: AdminCouponManager, meta: { title: 'مدیریت کدهای تخفیف' } },
       
       // Settings Route
       { path: 'settings', name: 'admin-settings', component: AdminSettings, meta: { title: 'تنظیمات سیستم' } }
@@ -71,14 +75,14 @@ export const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true }
   }
 ]
-
+ 
 // این تابع برای استفاده در حالت SPA معمولی (اگر نیاز شد) باقی می‌ماند
 // اما ViteSSG خودش روتر را می‌سازد
 export const createRouterInstance = () => createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes
 })
-
+ 
 // Navigation Guards Logic
 export const setupGuards = (router: any) => {
   router.beforeEach(async (to: any, from: any, next: any) => {
@@ -86,14 +90,14 @@ export const setupGuards = (router: any) => {
     if (import.meta.env.SSR) {
       return next()
     }
-
+ 
     const authStore = useAuthStore()
     
     // اگر وضعیت لاگین مشخص نیست، چک کن
     if (!authStore.session) {
       await authStore.initializeAuth()
     }
-
+ 
     if (to.meta.requiresAuth && !authStore.user) {
       next({ name: 'login' })
     } else if (to.meta.requiresAdmin && !authStore.isAdmin) {

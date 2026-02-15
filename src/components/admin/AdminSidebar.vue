@@ -11,19 +11,20 @@ import {
   BarChart3,
   ChevronRight,
   Layers,
-  Globe
+  Globe,
+  BadgePercent
 } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 import { useRoute } from 'vue-router'
-
+ 
 defineProps<{
   isOpen: boolean
 }>()
-
+ 
 const emit = defineEmits(['close'])
 const authStore = useAuthStore()
 const route = useRoute()
-
+ 
 const menuGroups = [
   {
     title: 'اصلی',
@@ -38,7 +39,8 @@ const menuGroups = [
       { routeName: 'admin-products', label: 'محصولات', icon: ShoppingBag },
       { routeName: 'admin-categories', label: 'دسته‌بندی‌ها', icon: Layers },
       { routeName: 'admin-orders', label: 'سفارشات', icon: ShoppingCart },
-      { routeName: 'admin-inventory', label: 'مدیریت موجودی', icon: Package }
+      { routeName: 'admin-inventory', label: 'مدیریت موجودی', icon: Package },
+      { routeName: 'admin-coupons', label: 'کدهای تخفیف', icon: BadgePercent}
     ]
   },
   {
@@ -55,10 +57,10 @@ const menuGroups = [
     ]
   }
 ]
-
+ 
 const isActive = (name: string) => route.name === name || (name === 'admin-products' && route.path.includes('/products/'))
 </script>
-
+ 
 <template>
   <aside 
     class="fixed inset-y-0 right-0 z-50 w-72 bg-white border-l border-gray-100 transform transition-transform duration-300 ease-in-out shadow-[0_0_40px_-10px_rgba(0,0,0,0.05)]"
@@ -76,7 +78,7 @@ const isActive = (name: string) => route.name === name || (name === 'admin-produ
         <ChevronRight class="w-5 h-5 hidden lg:block" />
       </button>
     </div>
-
+ 
     <!-- Menu Items -->
     <div class="p-6 space-y-8 overflow-y-auto h-[calc(100vh-9rem)]">
       <div v-for="(group, index) in menuGroups" :key="index">
@@ -108,7 +110,7 @@ const isActive = (name: string) => route.name === name || (name === 'admin-produ
         </ul>
       </div>
     </div>
-
+ 
     <!-- Footer -->
     <div class="absolute bottom-0 w-full p-6 border-t border-gray-50 bg-white">
       <button @click="authStore.logout" class="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-red-500 hover:bg-red-50 transition font-medium text-sm group">
@@ -117,7 +119,7 @@ const isActive = (name: string) => route.name === name || (name === 'admin-produ
       </button>
     </div>
   </aside>
-
+ 
   <div 
     v-if="isOpen" 
     @click="emit('close')"
