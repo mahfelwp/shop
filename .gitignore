@@ -40,4 +40,4 @@ coverage
 *.local
 .vite-ssg-temp
 db
- 
+ *.zip

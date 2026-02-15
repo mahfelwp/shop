@@ -198,13 +198,16 @@ const handlePayment = async () => {
  
     const status = paymentMethod.value === 'online' ? 'pending' : 'pending_approval'
     
+    // اصلاح: اطمینان از اینکه coupon_id یا عدد است یا null (نه undefined)
+    const couponId = appliedCoupon.value ? appliedCoupon.value.id : null
+
     const { data: orderData, error: orderError } = await supabase
       .from('orders')
       .insert({
         user_id: authStore.user.id,
         total_price: finalPrice.value, // استفاده از قیمت نهایی با تخفیف
         discount_amount: discountAmount.value, // ذخیره مبلغ تخفیف
-        coupon_id: appliedCoupon.value?.id || null, // ذخیره شناسه کوپن
+        coupon_id: couponId, // ذخیره شناسه کوپن
         status: status,
         shipping_address: `${form.value.address} - کدپستی: ${form.value.postalCode}`,
         receiver_name: form.value.fullName,

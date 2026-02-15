@@ -65,11 +65,15 @@ export const useAdminStore = defineStore('admin', () => {
         .select('*', { count: 'exact', head: true })
       
       // 2. Orders Data (دریافت همه سفارشات برای محاسبه دقیق آمار)
+      // اصلاح: اضافه کردن id و product_id به کوئری تو در تو
       const { data: oData, count: oCount } = await supabase
         .from('orders')
         .select(`
           *,
           order_items (
+            id,
+            order_id,
+            product_id,
             quantity,
             price_at_purchase,
             products (title, image, category)
