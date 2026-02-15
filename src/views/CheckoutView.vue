@@ -6,7 +6,7 @@ import { useSettingsStore } from '@/stores/settings'
 import { useToastStore } from '@/stores/toast'
 import { useRouter } from 'vue-router'
 import { supabase } from '@/lib/supabase'
-import { CreditCard, MapPin, Truck, Loader2, Upload, AlertCircle, Copy, Plus, Home, Briefcase, FileText, X } from 'lucide-vue-next'
+import { CreditCard, MapPin, Loader2, Upload, AlertCircle, Copy, Plus, FileText, X } from 'lucide-vue-next'
  
 const cartStore = useCartStore()
 const authStore = useAuthStore()
@@ -14,6 +14,9 @@ const settingsStore = useSettingsStore()
 const toastStore = useToastStore()
 const router = useRouter()
 const loading = ref(false)
+ 
+// Validation State
+const showErrors = ref(false)
  
 const paymentMethod = ref<'online' | 'card_to_card'>('online')
 const receiptFile = ref<File | null>(null)
@@ -28,11 +31,10 @@ const form = ref({
   phone: authStore.profile?.phone || '',
   address: '',
   postalCode: '',
-  note: '' // فیلد جدید برای توضیحات سفارش
+  note: ''
 })
  
 onMounted(async () => {
-  // اگر سبد خرید خالی است، برگرد به صفحه سبد خرید
   if (cartStore.totalItems === 0) {
     toastStore.showToast('سبد خرید شما خالی است', 'warning')
     router.push('/cart')
@@ -41,7 +43,6 @@ onMounted(async () => {
  
   settingsStore.fetchSettings()
   
-  // Fetch Saved Addresses
   if (authStore.user) {
     const { data } = await supabase
       .from('addresses')
@@ -51,23 +52,27 @@ onMounted(async () => {
     
     if (data && data.length > 0) {
       savedAddresses.value = data
-      selectedAddressId.value = data[0].id // Select first address by default
+      selectedAddressId.value = data[0].id
     }
   }
 })
  
-// Watch for address selection change
 watch(selectedAddressId, (newVal) => {
+  // Reset validation errors when switching address mode
+  showErrors.value = false
+  
   if (newVal === 'new') {
     form.value.address = ''
     form.value.postalCode = ''
     form.value.phone = authStore.profile?.phone || ''
+    form.value.fullName = authStore.profile?.full_name || ''
   } else {
     const addr = savedAddresses.value.find(a => a.id === newVal)
     if (addr) {
       form.value.address = addr.address
       form.value.postalCode = addr.postal_code || ''
       form.value.phone = addr.phone || authStore.profile?.phone || ''
+      // Note: Saved addresses might not have full name stored, keeping current or profile name
     }
   }
 })
@@ -77,13 +82,16 @@ const handleFileUpload = (event: Event) => {
   if (target.files && target.files[0]) {
     receiptFile.value = target.files[0]
     receiptPreview.value = URL.createObjectURL(target.files[0])
+    // Clear error for file input if any
+    if (showErrors.value) {
+      // Logic handled in template reactivity
+    }
   }
 }
  
 const removeReceipt = () => {
   receiptFile.value = null
   receiptPreview.value = null
-  // Reset input value to allow re-selecting same file if needed
   const input = document.getElementById('receipt-input') as HTMLInputElement
   if (input) input.value = ''
 }
@@ -94,18 +102,27 @@ const copyToClipboard = (text: string) => {
 }
  
 const handlePayment = async () => {
+  // 1. Trigger Validation UI
+  showErrors.value = true
+ 
   if (!authStore.user) {
     router.push('/login')
     return
   }
  
-  if (!form.value.fullName || !form.value.address || !form.value.phone) {
-    toastStore.showToast('لطفا اطلاعات ارسال را کامل کنید', 'warning')
+  // 2. Validate Fields
+  const isAddressValid = form.value.fullName && form.value.address && form.value.phone
+  const isReceiptValid = paymentMethod.value === 'online' || (paymentMethod.value === 'card_to_card' && receiptFile.value)
+ 
+  if (!isAddressValid) {
+    toastStore.showToast('لطفا فیلدهای ستاره‌دار (ضروری) را تکمیل کنید', 'error')
+    // Scroll to top to see errors
+    window.scrollTo({ top: 0, behavior: 'smooth' })
     return
   }
  
-  if (paymentMethod.value === 'card_to_card' && !receiptFile.value) {
-    toastStore.showToast('لطفا تصویر فیش واریزی را آپلود کنید', 'warning')
+  if (!isReceiptValid) {
+    toastStore.showToast('لطفا تصویر فیش واریزی را آپلود کنید', 'error')
     return
   }
  
@@ -114,7 +131,6 @@ const handlePayment = async () => {
   try {
     let receiptUrl = null
  
-    // 1. Upload Receipt if Card to Card
     if (paymentMethod.value === 'card_to_card' && receiptFile.value) {
       const fileName = `${authStore.user.id}_${Date.now()}_${receiptFile.value.name.replace(/[^a-zA-Z0-9.]/g, '')}`
       const { data: uploadData, error: uploadError } = await supabase.storage
@@ -123,12 +139,10 @@ const handlePayment = async () => {
       
       if (uploadError) throw uploadError
       
-      // Get Public URL
       const { data: publicUrlData } = supabase.storage.from('receipts').getPublicUrl(fileName)
       receiptUrl = publicUrlData.publicUrl
     }
  
-    // 2. Create Order
     const status = paymentMethod.value === 'online' ? 'pending' : 'pending_approval'
     
     const { data: orderData, error: orderError } = await supabase
@@ -142,14 +156,13 @@ const handlePayment = async () => {
         receiver_phone: form.value.phone,
         payment_method: paymentMethod.value,
         payment_receipt_url: receiptUrl,
-        note: form.value.note // ارسال توضیحات به دیتابیس
+        note: form.value.note
       })
       .select()
       .single()
  
     if (orderError) throw orderError
  
-    // 3. Create Order Items
     const orderItems = cartStore.items.map(item => ({
       order_id: orderData.id,
       product_id: item.id,
@@ -163,9 +176,8 @@ const handlePayment = async () => {
  
     if (itemsError) throw itemsError
  
-    // 4. Handle Payment Redirect
     if (paymentMethod.value === 'online') {
-      console.log('Redirecting to ZarinPal with Merchant:', settingsStore.settings.zarinpal_merchant)
+      console.log('Redirecting to ZarinPal...')
       setTimeout(() => {
         cartStore.clearCart()
         router.push({ 
@@ -239,22 +251,59 @@ const handlePayment = async () => {
           </div>
           
           <!-- Form Fields -->
-          <div class="grid md:grid-cols-2 gap-4 animate-fade-in" :class="{ 'opacity-50 pointer-events-none': selectedAddressId !== 'new' && false }">
+          <div class="grid md:grid-cols-2 gap-4 animate-fade-in">
+            <!-- Full Name -->
             <div class="space-y-1">
-              <label class="text-sm text-gray-600">نام و نام خانوادگی تحویل گیرنده</label>
-              <input v-model="form.fullName" type="text" class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 outline-none" />
+              <label class="text-sm text-gray-600 font-bold">
+                نام و نام خانوادگی تحویل گیرنده <span class="text-red-500">*</span>
+              </label>
+              <input 
+                v-model="form.fullName" 
+                type="text" 
+                class="w-full px-4 py-2 rounded-lg border outline-none transition"
+                :class="showErrors && !form.fullName ? 'border-red-500 bg-red-50 focus:border-red-500' : 'border-gray-300 focus:border-primary-500 focus:ring-1 focus:ring-primary-500'"
+              />
+              <span v-if="showErrors && !form.fullName" class="text-xs text-red-500">این فیلد الزامی است</span>
             </div>
+ 
+            <!-- Phone -->
             <div class="space-y-1">
-              <label class="text-sm text-gray-600">شماره موبایل</label>
-              <input v-model="form.phone" type="tel" class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 outline-none" />
+              <label class="text-sm text-gray-600 font-bold">
+                شماره موبایل <span class="text-red-500">*</span>
+              </label>
+              <input 
+                v-model="form.phone" 
+                type="tel" 
+                class="w-full px-4 py-2 rounded-lg border outline-none transition"
+                :class="showErrors && !form.phone ? 'border-red-500 bg-red-50 focus:border-red-500' : 'border-gray-300 focus:border-primary-500 focus:ring-1 focus:ring-primary-500'"
+              />
+              <span v-if="showErrors && !form.phone" class="text-xs text-red-500">این فیلد الزامی است</span>
             </div>
+ 
+            <!-- Address -->
             <div class="md:col-span-2 space-y-1">
-              <label class="text-sm text-gray-600">آدرس کامل پستی</label>
-              <textarea v-model="form.address" rows="3" class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 outline-none" :readonly="selectedAddressId !== 'new'"></textarea>
+              <label class="text-sm text-gray-600 font-bold">
+                آدرس کامل پستی <span class="text-red-500">*</span>
+              </label>
+              <textarea 
+                v-model="form.address" 
+                rows="3" 
+                class="w-full px-4 py-2 rounded-lg border outline-none transition"
+                :class="showErrors && !form.address ? 'border-red-500 bg-red-50 focus:border-red-500' : 'border-gray-300 focus:border-primary-500 focus:ring-1 focus:ring-primary-500'"
+                :readonly="selectedAddressId !== 'new'"
+              ></textarea>
+              <span v-if="showErrors && !form.address" class="text-xs text-red-500">این فیلد الزامی است</span>
             </div>
+ 
+            <!-- Postal Code -->
             <div class="space-y-1">
               <label class="text-sm text-gray-600">کد پستی (اختیاری)</label>
-              <input v-model="form.postalCode" type="text" class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 outline-none" :readonly="selectedAddressId !== 'new'" />
+              <input 
+                v-model="form.postalCode" 
+                type="text" 
+                class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 outline-none" 
+                :readonly="selectedAddressId !== 'new'" 
+              />
             </div>
           </div>
         </div>
@@ -337,16 +386,21 @@ const handlePayment = async () => {
               <div>
                 <h3 class="font-bold text-stone-800 mb-3 text-sm flex items-center gap-2">
                   <Upload class="w-4 h-4" />
-                  آپلود فیش واریزی
+                  آپلود فیش واریزی <span class="text-red-500">*</span>
                 </h3>
                 
                 <!-- Upload Box -->
-                <div class="border-2 border-dashed border-stone-300 rounded-xl p-6 text-center hover:bg-white transition cursor-pointer relative group">
+                <div 
+                  class="border-2 border-dashed rounded-xl p-6 text-center hover:bg-white transition cursor-pointer relative group"
+                  :class="showErrors && !receiptFile ? 'border-red-400 bg-red-50' : 'border-stone-300'"
+                >
                   <input id="receipt-input" type="file" accept="image/*" @change="handleFileUpload" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
                   
                   <div v-if="!receiptPreview" class="flex flex-col items-center gap-2 text-stone-500">
-                    <Upload class="w-8 h-8 text-stone-400" />
-                    <span class="text-sm">برای انتخاب تصویر کلیک کنید</span>
+                    <Upload class="w-8 h-8" :class="showErrors && !receiptFile ? 'text-red-400' : 'text-stone-400'" />
+                    <span class="text-sm" :class="showErrors && !receiptFile ? 'text-red-500 font-bold' : ''">
+                      {{ showErrors && !receiptFile ? 'لطفا تصویر فیش را انتخاب کنید' : 'برای انتخاب تصویر کلیک کنید' }}
+                    </span>
                   </div>
                   
                   <div v-else class="relative z-20">
