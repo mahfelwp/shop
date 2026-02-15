@@ -5,6 +5,7 @@ import ProductListView from '../views/ProductListView.vue'
 import CartView from '../views/CartView.vue'
 import CheckoutView from '../views/CheckoutView.vue'
 import PaymentResultView from '../views/PaymentResultView.vue'
+import ShippingPaymentView from '../views/ShippingPaymentView.vue' // New View
 import UserProfile from '../views/user/UserProfile.vue'
 import { useAuthStore } from '@/stores/auth'
  
@@ -22,7 +23,6 @@ import AdminSettings from '../views/admin/AdminSettings.vue'
 import AdminSetup from '../views/admin/AdminSetup.vue'
 import AdminCouponManager from '../components/admin/AdminCouponManager.vue'
  
-// اکسپورت کردن routes به صورت جداگانه برای استفاده در main.ts و vite-ssg
 export const routes: RouteRecordRaw[] = [
   { path: '/', name: 'home', component: HomeView },
   { path: '/products', name: 'products', component: ProductListView },
@@ -30,6 +30,9 @@ export const routes: RouteRecordRaw[] = [
   { path: '/cart', name: 'cart', component: CartView },
   { path: '/checkout', name: 'checkout', component: CheckoutView, meta: { requiresAuth: true } },
   { path: '/payment-result', name: 'payment-result', component: PaymentResultView },
+  
+  // New Route for Shipping Payment
+  { path: '/pay-shipping/:token', name: 'pay-shipping', component: ShippingPaymentView, meta: { hideLayout: true } },
   
   // پنل ادمین
   { 
@@ -76,24 +79,19 @@ export const routes: RouteRecordRaw[] = [
   }
 ]
  
-// این تابع برای استفاده در حالت SPA معمولی (اگر نیاز شد) باقی می‌ماند
-// اما ViteSSG خودش روتر را می‌سازد
 export const createRouterInstance = () => createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes
 })
  
-// Navigation Guards Logic
 export const setupGuards = (router: any) => {
   router.beforeEach(async (to: any, from: any, next: any) => {
-    // در محیط بیلد (Server-Side) نیازی به چک کردن Auth نیست
     if (import.meta.env.SSR) {
       return next()
     }
  
     const authStore = useAuthStore()
     
-    // اگر وضعیت لاگین مشخص نیست، چک کن
     if (!authStore.session) {
       await authStore.initializeAuth()
     }

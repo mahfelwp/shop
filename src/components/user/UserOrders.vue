@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { Package, Truck, CheckCircle2, ClipboardList, XCircle, Clock, ChevronDown, ChevronUp, ShoppingBag, CreditCard, Wallet, Receipt, Phone } from 'lucide-vue-next'
+import { Package, Truck, CheckCircle2, ClipboardList, XCircle, Clock, ChevronDown, ChevronUp, ShoppingBag, CreditCard, Wallet, Receipt, Phone, AlertTriangle } from 'lucide-vue-next'
 import { useToastStore } from '@/stores/toast'
 import { useSettingsStore } from '@/stores/settings'
+import { useRouter } from 'vue-router'
  
 const props = defineProps<{
   orders: any[]
@@ -11,6 +12,7 @@ const props = defineProps<{
  
 const toastStore = useToastStore()
 const settingsStore = useSettingsStore()
+const router = useRouter()
 const expandedOrders = ref<Set<number>>(new Set())
  
 onMounted(() => {
@@ -18,7 +20,6 @@ onMounted(() => {
 })
 
 const toggleOrderDetails = (orderId: number) => {
-  // اصلاح خطا: استفاده از .value برای دسترسی به متدهای Set درون ref
   if (expandedOrders.value.has(orderId)) {
     expandedOrders.value.delete(orderId)
   } else {
@@ -93,6 +94,10 @@ const isCourier = (order: any) => {
   const method = settingsStore.shippingMethods.find(m => m.id === order.shipping_method_id)
   return method?.type === 'courier'
 }
+
+const payShipping = (token: string) => {
+  router.push({ name: 'pay-shipping', params: { token } })
+}
 </script>
  
 <template>
@@ -137,6 +142,20 @@ const isCourier = (order: any) => {
                 {{ getStatusText(order.status) }}
               </span>
             </div>
+          </div>
+
+          <!-- Shipping Payment Alert -->
+          <div v-if="order.shipping_payment_status === 'pending_payment'" class="bg-red-50 border border-red-100 rounded-xl p-4 mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="flex items-center gap-3 text-red-700">
+              <AlertTriangle class="w-6 h-6" />
+              <div>
+                <div class="font-bold text-sm">هزینه ارسال محاسبه شده است</div>
+                <div class="text-xs mt-1">لطفا مبلغ {{ order.shipping_cost_real.toLocaleString() }} تومان بابت هزینه ارسال پرداخت کنید.</div>
+              </div>
+            </div>
+            <button @click="payShipping(order.shipping_payment_token)" class="bg-red-600 text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-red-700 transition shadow-md shadow-red-200">
+              پرداخت هزینه ارسال
+            </button>
           </div>
  
           <!-- Timeline -->
@@ -241,6 +260,8 @@ const isCourier = (order: any) => {
                   <div class="flex justify-between text-stone-600">
                     <span>هزینه ارسال ({{ getShippingMethodTitle(order) }}):</span>
                     <span v-if="order.shipping_cost > 0">{{ order.shipping_cost.toLocaleString() }} تومان</span>
+                    <span v-else-if="order.shipping_payment_status === 'paid_separately'" class="text-green-600 font-bold">پرداخت شده ({{ order.shipping_cost_real.toLocaleString() }})</span>
+                    <span v-else-if="order.shipping_payment_status === 'pending_payment'" class="text-red-500 font-bold">منتظر پرداخت ({{ order.shipping_cost_real.toLocaleString() }})</span>
                     <span v-else class="text-green-600 font-bold">رایگان / پس‌کرایه</span>
                   </div>
                   <div class="border-t border-stone-200 my-2"></div>

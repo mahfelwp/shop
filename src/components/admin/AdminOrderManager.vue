@@ -4,7 +4,7 @@ import { useAdminStore } from '@/stores/admin'
 import { useSettingsStore } from '@/stores/settings'
 import { useToastStore } from '@/stores/toast'
 import { supabase } from '@/lib/supabase'
-import { Edit, CreditCard, DollarSign, Truck, Eye, X, ImageIcon, Save, Trash2, Plus, Search, Package, MapPin, User, Phone, Loader2 } from 'lucide-vue-next'
+import { Edit, CreditCard, DollarSign, Truck, Eye, X, ImageIcon, Save, Trash2, Plus, Search, Package, MapPin, User, Phone, Loader2, Link as LinkIcon, Copy, CheckCircle2 } from 'lucide-vue-next'
 
 const adminStore = useAdminStore()
 const settingsStore = useSettingsStore()
@@ -27,7 +27,10 @@ const shippingForm = ref({
 const statusForm = ref({
   status: '',
   tracking_code: '',
-  shipping_method_id: null as number | null
+  shipping_method_id: null as number | null,
+  // New Fields for Shipping Cost
+  shipping_cost_real: 0,
+  shipping_payment_status: 'waived'
 })
 
 const loadingProducts = ref(false)
@@ -53,6 +56,8 @@ const openModal = (order: any) => {
   statusForm.value.status = order.status
   statusForm.value.tracking_code = order.tracking_code || ''
   statusForm.value.shipping_method_id = order.shipping_method_id || null
+  statusForm.value.shipping_cost_real = order.shipping_cost_real || 0
+  statusForm.value.shipping_payment_status = order.shipping_payment_status || 'waived'
   
   shippingForm.value.receiver_name = order.receiver_name
   shippingForm.value.receiver_phone = order.receiver_phone
@@ -75,7 +80,9 @@ const updateStatus = async () => {
     .update({
       status: statusForm.value.status,
       tracking_code: statusForm.value.tracking_code || null,
-      shipping_method_id: statusForm.value.shipping_method_id
+      shipping_method_id: statusForm.value.shipping_method_id,
+      shipping_cost_real: statusForm.value.shipping_cost_real,
+      shipping_payment_status: statusForm.value.shipping_payment_status
     })
     .eq('id', selectedOrder.value.id)
 
@@ -84,6 +91,8 @@ const updateStatus = async () => {
     selectedOrder.value.status = statusForm.value.status
     selectedOrder.value.tracking_code = statusForm.value.tracking_code
     selectedOrder.value.shipping_method_id = statusForm.value.shipping_method_id
+    selectedOrder.value.shipping_cost_real = statusForm.value.shipping_cost_real
+    selectedOrder.value.shipping_payment_status = statusForm.value.shipping_payment_status
     await adminStore.fetchStats() // Refresh list
   } else {
     toastStore.showToast('خطا در بروزرسانی', 'error')
@@ -101,7 +110,22 @@ const verifyPayment = async (approved: boolean) => {
   }
 }
 
-// ... (Other methods remain same: saveShippingInfo, recalculateTotal, updateItemQty, removeItem, addItemToOrder) ...
+const verifyShippingPayment = async (approved: boolean) => {
+  if (!selectedOrder.value) return
+  const newStatus = approved ? 'paid_separately' : 'pending_payment'
+  
+  const { error } = await supabase
+    .from('orders')
+    .update({ shipping_payment_status: newStatus })
+    .eq('id', selectedOrder.value.id)
+
+  if (!error) {
+    toastStore.showToast(approved ? 'پرداخت هزینه ارسال تایید شد' : 'پرداخت هزینه ارسال رد شد', approved ? 'success' : 'warning')
+    statusForm.value.shipping_payment_status = newStatus
+    selectedOrder.value.shipping_payment_status = newStatus
+  }
+}
+
 const saveShippingInfo = async () => {
   if (!selectedOrder.value) return
   const { error } = await supabase.from('orders').update({
@@ -208,10 +232,25 @@ const getStatusColor = (status: string) => {
   return map[status] || 'bg-gray-100'
 }
 
-const getSelectedMethodType = computed(() => {
-  const method = settingsStore.shippingMethods.find(m => m.id === statusForm.value.shipping_method_id)
-  return method?.type || 'post'
+const getSelectedMethod = computed(() => {
+  return settingsStore.shippingMethods.find(m => m.id === statusForm.value.shipping_method_id)
 })
+
+const generatePaymentLink = () => {
+  if (!selectedOrder.value?.shipping_payment_token) return ''
+  return `${window.location.origin}/pay-shipping/${selectedOrder.value.shipping_payment_token}`
+}
+
+const copyLink = () => {
+  const link = generatePaymentLink()
+  navigator.clipboard.writeText(link)
+  toastStore.showToast('لینک پرداخت کپی شد', 'success')
+}
+
+const setShippingToPending = () => {
+  statusForm.value.shipping_payment_status = 'pending_payment'
+  updateStatus()
+}
 </script>
 
 <template>
@@ -259,6 +298,9 @@ const getSelectedMethodType = computed(() => {
             </td>
             <td class="p-4">
               <span class="px-2 py-1 rounded-lg text-xs font-bold" :class="getStatusColor(order.status)">{{ getStatusLabel(order.status) }}</span>
+              <div v-if="order.shipping_payment_status === 'pending_payment'" class="mt-1 text-[10px] text-red-500 font-bold flex items-center gap-1">
+                <Truck class="w-3 h-3" /> منتظر پرداخت هزینه ارسال
+              </div>
             </td>
             <td class="p-4 flex items-center gap-2">
               <button @click="openModal(order)" class="bg-stone-900 text-white px-3 py-1.5 rounded-lg text-xs hover:bg-accent transition flex items-center gap-1"><Edit class="w-3 h-3" /> مدیریت</button>
@@ -284,16 +326,18 @@ const getSelectedMethodType = computed(() => {
 
         <!-- Tabs -->
         <div class="flex border-b border-stone-200 bg-stone-50 shrink-0">
-          <button @click="activeTab = 'status'" class="flex-1 py-3 text-sm font-bold transition border-b-2" :class="activeTab === 'status' ? 'border-stone-900 text-stone-900 bg-white' : 'border-transparent text-stone-500 hover:bg-stone-100'">وضعیت و پرداخت</button>
+          <button @click="activeTab = 'status'" class="flex-1 py-3 text-sm font-bold transition border-b-2" :class="activeTab === 'status' ? 'border-stone-900 text-stone-900 bg-white' : 'border-transparent text-stone-500 hover:bg-stone-100'">وضعیت و ارسال</button>
           <button @click="activeTab = 'items'" class="flex-1 py-3 text-sm font-bold transition border-b-2" :class="activeTab === 'items' ? 'border-stone-900 text-stone-900 bg-white' : 'border-transparent text-stone-500 hover:bg-stone-100'">اقلام سفارش</button>
-          <button @click="activeTab = 'shipping'" class="flex-1 py-3 text-sm font-bold transition border-b-2" :class="activeTab === 'shipping' ? 'border-stone-900 text-stone-900 bg-white' : 'border-transparent text-stone-500 hover:bg-stone-100'">اطلاعات ارسال</button>
+          <button @click="activeTab = 'shipping'" class="flex-1 py-3 text-sm font-bold transition border-b-2" :class="activeTab === 'shipping' ? 'border-stone-900 text-stone-900 bg-white' : 'border-transparent text-stone-500 hover:bg-stone-100'">اطلاعات گیرنده</button>
         </div>
         
         <!-- Modal Body -->
         <div class="p-6 overflow-y-auto flex-grow">
           
-          <!-- TAB 1: STATUS & PAYMENT -->
+          <!-- TAB 1: STATUS & SHIPPING -->
           <div v-if="activeTab === 'status'" class="space-y-6 animate-fade-in">
+            
+            <!-- Order Summary -->
             <div class="bg-stone-50 p-4 rounded-xl border border-stone-200 flex justify-between items-center">
               <div>
                 <div class="text-sm text-stone-500 mb-1">مبلغ کل سفارش</div>
@@ -305,9 +349,9 @@ const getSelectedMethodType = computed(() => {
               </div>
             </div>
 
-            <!-- Receipt Check -->
+            <!-- Receipt Check (Main Order) -->
             <div v-if="selectedOrder?.payment_method === 'card_to_card' && selectedOrder?.status === 'pending_approval'" class="space-y-3 border-t border-stone-100 pt-4">
-              <label class="block text-sm font-bold text-stone-700">بررسی فیش واریزی</label>
+              <label class="block text-sm font-bold text-stone-700">بررسی فیش واریزی (سفارش اصلی)</label>
               <div v-if="selectedOrder.payment_receipt_url" class="relative group cursor-pointer" @click="viewReceipt(selectedOrder.payment_receipt_url)">
                 <img :src="selectedOrder.payment_receipt_url" class="w-full h-40 object-cover rounded-xl border border-stone-200" />
                 <div class="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition rounded-xl">
@@ -321,56 +365,107 @@ const getSelectedMethodType = computed(() => {
               </div>
             </div>
 
-            <!-- Status Update -->
-            <div class="space-y-4 border-t border-stone-100 pt-4">
+            <!-- Shipping Method & Cost Management -->
+            <div class="bg-indigo-50 p-4 rounded-xl border border-indigo-100 space-y-4">
+              <h4 class="font-bold text-indigo-900 flex items-center gap-2 border-b border-indigo-200 pb-2">
+                <Truck class="w-5 h-5" /> مدیریت ارسال
+              </h4>
+              
               <div>
-                <label class="block text-sm font-bold text-stone-700 mb-2">تغییر وضعیت سفارش</label>
-                <select v-model="statusForm.status" class="w-full p-3 rounded-xl border border-stone-300 focus:border-stone-900 outline-none bg-white">
-                  <option value="pending">در انتظار پرداخت</option>
-                  <option value="pending_approval">در انتظار تایید فیش</option>
-                  <option value="paid">پرداخت شده</option>
-                  <option value="processing">در حال پردازش</option>
-                  <option value="shipped">ارسال شده</option>
-                  <option value="delivered">تحویل مشتری شده</option>
-                  <option value="cancelled">لغو شده</option>
+                <label class="block text-sm font-bold text-indigo-900 mb-2">روش ارسال</label>
+                <select v-model="statusForm.shipping_method_id" class="w-full p-3 rounded-xl border border-indigo-200 focus:border-indigo-500 outline-none bg-white">
+                  <option :value="null">انتخاب نشده</option>
+                  <option v-for="method in settingsStore.shippingMethods" :key="method.id" :value="method.id">
+                    {{ method.title }} ({{ method.cost_type === 'fixed' ? 'هزینه ثابت' : (method.cost_type === 'pas_kerayeh' ? 'پس‌کرایه' : 'محاسبه بعدی') }})
+                  </option>
                 </select>
               </div>
 
-              <!-- Shipping Method & Tracking -->
-              <div class="bg-indigo-50 p-4 rounded-xl border border-indigo-100 space-y-4">
-                <div>
-                  <label class="block text-sm font-bold text-indigo-900 mb-2 flex items-center gap-2">
-                    <Truck class="w-4 h-4" />
-                    روش ارسال
-                  </label>
-                  <select v-model="statusForm.shipping_method_id" class="w-full p-3 rounded-xl border border-indigo-200 focus:border-indigo-500 outline-none bg-white">
-                    <option :value="null">انتخاب نشده</option>
-                    <option v-for="method in settingsStore.shippingMethods" :key="method.id" :value="method.id">
-                      {{ method.title }} ({{ method.type === 'post' ? 'پستی' : 'پیک/راننده' }})
-                    </option>
-                  </select>
+              <!-- Calculated Later Logic -->
+              <div v-if="getSelectedMethod?.cost_type === 'calculated_later'" class="bg-white p-4 rounded-xl border border-indigo-200 space-y-3">
+                <div class="text-sm text-indigo-800 font-bold">محاسبه هزینه ارسال</div>
+                <div class="flex gap-2">
+                  <input 
+                    v-model="statusForm.shipping_cost_real" 
+                    type="number" 
+                    placeholder="هزینه واقعی (تومان)" 
+                    class="flex-grow p-2 rounded-lg border border-indigo-200 focus:border-indigo-500 outline-none"
+                  />
+                  <button 
+                    v-if="statusForm.shipping_payment_status === 'waived' || statusForm.shipping_payment_status === 'pending_payment'"
+                    @click="setShippingToPending" 
+                    class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-indigo-700 transition"
+                  >
+                    ثبت و ایجاد لینک
+                  </button>
                 </div>
 
-                <div>
-                  <label class="block text-sm font-bold text-indigo-900 mb-2 flex items-center gap-2">
-                    {{ getSelectedMethodType === 'post' ? 'کد رهگیری پستی / تیپاکس' : 'شماره تماس راننده / پیک' }}
-                  </label>
-                  <div class="relative">
-                    <input 
-                      v-model="statusForm.tracking_code" 
-                      type="text" 
-                      :placeholder="getSelectedMethodType === 'post' ? 'کد رهگیری را اینجا وارد کنید...' : 'شماره تماس راننده...'" 
-                      class="w-full p-3 pl-10 rounded-xl border border-indigo-200 focus:border-indigo-500 outline-none font-mono dir-ltr bg-white" 
-                    />
-                    <Truck class="w-5 h-5 text-indigo-300 absolute left-3 top-3.5" />
+                <!-- Payment Link Display -->
+                <div v-if="statusForm.shipping_payment_status === 'pending_payment'" class="bg-indigo-50 p-3 rounded-lg border border-indigo-100">
+                  <div class="text-xs text-indigo-600 mb-1">لینک پرداخت هزینه ارسال:</div>
+                  <div class="flex gap-2">
+                    <input :value="generatePaymentLink()" readonly class="flex-grow bg-white p-1.5 rounded border border-indigo-200 text-xs font-mono dir-ltr" />
+                    <button @click="copyLink" class="bg-white p-1.5 rounded border border-indigo-200 hover:bg-indigo-50 text-indigo-600"><Copy class="w-4 h-4" /></button>
+                  </div>
+                  <div class="text-[10px] text-indigo-400 mt-1">این لینک را برای مشتری پیامک کنید.</div>
+                </div>
+
+                <!-- Shipping Payment Status -->
+                <div class="flex items-center justify-between text-sm">
+                  <span>وضعیت پرداخت هزینه ارسال:</span>
+                  <span class="font-bold" :class="{
+                    'text-red-500': statusForm.shipping_payment_status === 'pending_payment',
+                    'text-green-600': statusForm.shipping_payment_status === 'paid_separately',
+                    'text-gray-500': statusForm.shipping_payment_status === 'waived'
+                  }">
+                    {{ statusForm.shipping_payment_status === 'pending_payment' ? 'منتظر پرداخت' : (statusForm.shipping_payment_status === 'paid_separately' ? 'پرداخت شده' : 'تعیین نشده') }}
+                  </span>
+                </div>
+
+                <!-- Shipping Receipt Check -->
+                <div v-if="selectedOrder.shipping_receipt_url && statusForm.shipping_payment_status === 'pending_payment'" class="mt-2 pt-2 border-t border-indigo-100">
+                  <div class="text-xs font-bold text-indigo-800 mb-2">فیش واریزی هزینه ارسال:</div>
+                  <div class="flex gap-2 items-center">
+                    <button @click="viewReceipt(selectedOrder.shipping_receipt_url)" class="text-blue-600 text-xs hover:underline flex items-center gap-1"><Eye class="w-3 h-3" /> مشاهده فیش</button>
+                    <button @click="verifyShippingPayment(true)" class="bg-green-500 text-white px-2 py-1 rounded text-xs hover:bg-green-600">تایید</button>
+                    <button @click="verifyShippingPayment(false)" class="bg-red-500 text-white px-2 py-1 rounded text-xs hover:bg-red-600">رد</button>
                   </div>
                 </div>
               </div>
 
-              <button @click="updateStatus" class="w-full bg-stone-900 text-white py-3 rounded-xl font-bold hover:bg-accent transition flex items-center justify-center gap-2">
-                <Save class="w-4 h-4" /> ذخیره تغییرات وضعیت
-              </button>
+              <div>
+                <label class="block text-sm font-bold text-indigo-900 mb-2 flex items-center gap-2">
+                  {{ getSelectedMethod?.type === 'post' ? 'کد رهگیری پستی / تیپاکس' : 'شماره تماس راننده / پیک' }}
+                </label>
+                <div class="relative">
+                  <input 
+                    v-model="statusForm.tracking_code" 
+                    type="text" 
+                    :placeholder="getSelectedMethod?.type === 'post' ? 'کد رهگیری را اینجا وارد کنید...' : 'شماره تماس راننده...'" 
+                    class="w-full p-3 pl-10 rounded-xl border border-indigo-200 focus:border-indigo-500 outline-none font-mono dir-ltr bg-white" 
+                  />
+                  <Truck class="w-5 h-5 text-indigo-300 absolute left-3 top-3.5" />
+                </div>
+              </div>
             </div>
+
+            <!-- Main Status Update -->
+            <div>
+              <label class="block text-sm font-bold text-stone-700 mb-2">تغییر وضعیت کلی سفارش</label>
+              <select v-model="statusForm.status" class="w-full p-3 rounded-xl border border-stone-300 focus:border-stone-900 outline-none bg-white">
+                <option value="pending">در انتظار پرداخت</option>
+                <option value="pending_approval">در انتظار تایید فیش</option>
+                <option value="paid">پرداخت شده</option>
+                <option value="processing">در حال پردازش</option>
+                <option value="shipped">ارسال شده</option>
+                <option value="delivered">تحویل مشتری شده</option>
+                <option value="cancelled">لغو شده</option>
+              </select>
+            </div>
+
+            <button @click="updateStatus" class="w-full bg-stone-900 text-white py-3 rounded-xl font-bold hover:bg-accent transition flex items-center justify-center gap-2">
+              <Save class="w-4 h-4" /> ذخیره تغییرات
+            </button>
           </div>
 
           <!-- TAB 2: ORDER ITEMS -->

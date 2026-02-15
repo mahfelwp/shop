@@ -7,6 +7,7 @@ export interface ShippingMethod {
   title: string
   cost: number
   type: 'post' | 'courier'
+  cost_type: 'fixed' | 'pas_kerayeh' | 'calculated_later'
   tracking_url_template?: string
   is_active: boolean
 }
