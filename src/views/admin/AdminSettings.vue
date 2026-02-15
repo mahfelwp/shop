@@ -1,17 +1,18 @@
 <script setup lang="ts">
 import { ref, shallowRef } from 'vue'
-import { CreditCard, RefreshCw, Settings, ChevronLeft } from 'lucide-vue-next'
+import { CreditCard, RefreshCw, Settings, ChevronLeft, Truck } from 'lucide-vue-next'
 
 // Import Sub-Components
 import PaymentSettings from '@/components/admin/settings/PaymentSettings.vue'
 import CurrencySettings from '@/components/admin/settings/CurrencySettings.vue'
+import ShippingSettings from '@/components/admin/settings/ShippingSettings.vue'
 
 const activeTab = ref('payment')
 
 const tabs = [
   { id: 'payment', label: 'درگاه و پرداخت', icon: CreditCard, component: PaymentSettings },
+  { id: 'shipping', label: 'روش‌های ارسال', icon: Truck, component: ShippingSettings },
   { id: 'currency', label: 'نرخ ارز و طلا', icon: RefreshCw, component: CurrencySettings },
-  // { id: 'general', label: 'تنظیمات عمومی', icon: Settings, component: null }, // Placeholder for future
 ]
 </script>
 

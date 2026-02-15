@@ -2,6 +2,15 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { supabase } from '@/lib/supabase'
 
+export interface ShippingMethod {
+  id: number
+  title: string
+  cost: number
+  type: 'post' | 'courier'
+  tracking_url_template?: string
+  is_active: boolean
+}
+
 export const useSettingsStore = defineStore('settings', () => {
   const settings = ref({
     zarinpal_merchant: '',
@@ -10,13 +19,13 @@ export const useSettingsStore = defineStore('settings', () => {
     card_shaba: '',
     bank_name: ''
   })
+  
+  const shippingMethods = ref<ShippingMethod[]>([])
   const loading = ref(false)
 
-  // دریافت تنظیمات از دیتابیس
+  // دریافت تنظیمات کلی
   const fetchSettings = async () => {
     loading.value = true
-    // فرض می‌کنیم یک جدول site_settings داریم که یک ردیف دارد
-    // اگر جدول ندارید، فعلا مقادیر پیش‌فرض را برمی‌گرداند یا می‌توانید دستی در کد ست کنید
     const { data, error } = await supabase
       .from('site_settings')
       .select('*')
@@ -28,11 +37,9 @@ export const useSettingsStore = defineStore('settings', () => {
     loading.value = false
   }
 
-  // ذخیره تنظیمات
+  // ذخیره تنظیمات کلی
   const updateSettings = async (newSettings: any) => {
     loading.value = true
-    
-    // بررسی اینکه آیا ردیفی وجود دارد یا خیر
     const { data: existing } = await supabase.from('site_settings').select('id').single()
 
     let error
@@ -56,5 +63,70 @@ export const useSettingsStore = defineStore('settings', () => {
     return error
   }
 
-  return { settings, loading, fetchSettings, updateSettings }
+  // --- Shipping Methods ---
+
+  const fetchShippingMethods = async () => {
+    loading.value = true
+    const { data, error } = await supabase
+      .from('shipping_methods')
+      .select('*')
+      .order('id')
+    
+    if (data) {
+      shippingMethods.value = data
+    }
+    loading.value = false
+  }
+
+  const addShippingMethod = async (method: Omit<ShippingMethod, 'id'>) => {
+    const { data, error } = await supabase
+      .from('shipping_methods')
+      .insert([method])
+      .select()
+      .single()
+    
+    if (data) {
+      shippingMethods.value.push(data)
+    }
+    return error
+  }
+
+  const updateShippingMethod = async (id: number, updates: Partial<ShippingMethod>) => {
+    const { data, error } = await supabase
+      .from('shipping_methods')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single()
+    
+    if (data) {
+      const index = shippingMethods.value.findIndex(m => m.id === id)
+      if (index !== -1) shippingMethods.value[index] = data
+    }
+    return error
+  }
+
+  const deleteShippingMethod = async (id: number) => {
+    const { error } = await supabase
+      .from('shipping_methods')
+      .delete()
+      .eq('id', id)
+    
+    if (!error) {
+      shippingMethods.value = shippingMethods.value.filter(m => m.id !== id)
+    }
+    return error
+  }
+
+  return { 
+    settings, 
+    shippingMethods, 
+    loading, 
+    fetchSettings, 
+    updateSettings,
+    fetchShippingMethods,
+    addShippingMethod,
+    updateShippingMethod,
+    deleteShippingMethod
+  }
 })

@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useAdminStore } from '@/stores/admin'
+import { useSettingsStore } from '@/stores/settings'
 import { useToastStore } from '@/stores/toast'
 import { supabase } from '@/lib/supabase'
 import { Edit, CreditCard, DollarSign, Truck, Eye, X, ImageIcon, Save, Trash2, Plus, Search, Package, MapPin, User, Phone, Loader2 } from 'lucide-vue-next'
 
 const adminStore = useAdminStore()
+const settingsStore = useSettingsStore()
 const toastStore = useToastStore()
 
 const showModal = ref(false)
@@ -24,16 +26,16 @@ const shippingForm = ref({
 })
 const statusForm = ref({
   status: '',
-  tracking_code: ''
+  tracking_code: '',
+  shipping_method_id: null as number | null
 })
 
 const loadingProducts = ref(false)
 
 onMounted(async () => {
-  // دریافت لیست سفارشات
   await adminStore.fetchStats()
+  await settingsStore.fetchShippingMethods()
 
-  // دریافت لیست محصولات برای افزودن به سفارش
   loadingProducts.value = true
   const { data } = await supabase.from('products').select('id, title, price, image, stock')
   if (data) allProducts.value = data
@@ -46,11 +48,11 @@ const filteredProducts = computed(() => {
 })
 
 const openModal = (order: any) => {
-  selectedOrder.value = JSON.parse(JSON.stringify(order)) // Deep copy to avoid direct mutation issues
+  selectedOrder.value = JSON.parse(JSON.stringify(order))
   
-  // Init Forms
   statusForm.value.status = order.status
   statusForm.value.tracking_code = order.tracking_code || ''
+  statusForm.value.shipping_method_id = order.shipping_method_id || null
   
   shippingForm.value.receiver_name = order.receiver_name
   shippingForm.value.receiver_phone = order.receiver_phone
@@ -65,16 +67,24 @@ const viewReceipt = (url: string) => {
   showReceiptModal.value = true
 }
 
-// --- Status & Payment Actions ---
-
 const updateStatus = async () => {
   if (!selectedOrder.value) return
-  const error = await adminStore.updateOrderStatus(selectedOrder.value.id, statusForm.value.status, statusForm.value.tracking_code)
+  
+  const { error } = await supabase
+    .from('orders')
+    .update({
+      status: statusForm.value.status,
+      tracking_code: statusForm.value.tracking_code || null,
+      shipping_method_id: statusForm.value.shipping_method_id
+    })
+    .eq('id', selectedOrder.value.id)
+
   if (!error) {
-    toastStore.showToast('وضعیت سفارش و کد رهگیری بروزرسانی شد', 'success')
-    // Update local selected order status to reflect changes immediately in UI if needed
+    toastStore.showToast('وضعیت سفارش بروزرسانی شد', 'success')
     selectedOrder.value.status = statusForm.value.status
     selectedOrder.value.tracking_code = statusForm.value.tracking_code
+    selectedOrder.value.shipping_method_id = statusForm.value.shipping_method_id
+    await adminStore.fetchStats() // Refresh list
   } else {
     toastStore.showToast('خطا در بروزرسانی', 'error')
   }
@@ -91,23 +101,16 @@ const verifyPayment = async (approved: boolean) => {
   }
 }
 
-// --- Shipping Info Actions ---
-
+// ... (Other methods remain same: saveShippingInfo, recalculateTotal, updateItemQty, removeItem, addItemToOrder) ...
 const saveShippingInfo = async () => {
   if (!selectedOrder.value) return
-  
-  const { error } = await supabase
-    .from('orders')
-    .update({
+  const { error } = await supabase.from('orders').update({
       receiver_name: shippingForm.value.receiver_name,
       receiver_phone: shippingForm.value.receiver_phone,
       shipping_address: shippingForm.value.shipping_address
-    })
-    .eq('id', selectedOrder.value.id)
-
+    }).eq('id', selectedOrder.value.id)
   if (!error) {
     toastStore.showToast('اطلاعات ارسال ذخیره شد', 'success')
-    // Update main list locally
     const idx = adminStore.orders.findIndex(o => o.id === selectedOrder.value.id)
     if (idx !== -1) {
       adminStore.orders[idx].receiver_name = shippingForm.value.receiver_name
@@ -119,24 +122,12 @@ const saveShippingInfo = async () => {
   }
 }
 
-// --- Order Items Actions ---
-
 const recalculateTotal = async () => {
   if (!selectedOrder.value) return
-  
-  const newTotal = selectedOrder.value.order_items.reduce((sum: number, item: any) => {
-    return sum + (item.price_at_purchase * item.quantity)
-  }, 0)
-
-  // Update DB
-  const { error } = await supabase
-    .from('orders')
-    .update({ total_price: newTotal })
-    .eq('id', selectedOrder.value.id)
-
+  const newTotal = selectedOrder.value.order_items.reduce((sum: number, item: any) => sum + (item.price_at_purchase * item.quantity), 0)
+  const { error } = await supabase.from('orders').update({ total_price: newTotal }).eq('id', selectedOrder.value.id)
   if (!error) {
     selectedOrder.value.total_price = newTotal
-    // Update main list
     const idx = adminStore.orders.findIndex(o => o.id === selectedOrder.value.id)
     if (idx !== -1) adminStore.orders[idx].total_price = newTotal
   }
@@ -145,12 +136,7 @@ const recalculateTotal = async () => {
 const updateItemQty = async (item: any, change: number) => {
   const newQty = item.quantity + change
   if (newQty < 1) return
-
-  const { error } = await supabase
-    .from('order_items')
-    .update({ quantity: newQty })
-    .eq('id', item.id)
-
+  const { error } = await supabase.from('order_items').update({ quantity: newQty }).eq('id', item.id)
   if (!error) {
     item.quantity = newQty
     await recalculateTotal()
@@ -162,12 +148,7 @@ const updateItemQty = async (item: any, change: number) => {
 
 const removeItem = async (itemId: number) => {
   if (!confirm('آیا از حذف این آیتم اطمینان دارید؟')) return
-
-  const { error } = await supabase
-    .from('order_items')
-    .delete()
-    .eq('id', itemId)
-
+  const { error } = await supabase.from('order_items').delete().eq('id', itemId)
   if (!error) {
     selectedOrder.value.order_items = selectedOrder.value.order_items.filter((i: any) => i.id !== itemId)
     await recalculateTotal()
@@ -178,32 +159,19 @@ const removeItem = async (itemId: number) => {
 }
 
 const addItemToOrder = async (product: any) => {
-  // Check if already exists
   const existingItem = selectedOrder.value.order_items.find((i: any) => i.product_id === product.id)
-  
   if (existingItem) {
     await updateItemQty(existingItem, 1)
     productSearch.value = ''
     return
   }
-
-  // Insert new item
   const newItem = {
     order_id: selectedOrder.value.id,
     product_id: product.id,
     quantity: 1,
     price_at_purchase: product.price
   }
-
-  const { data, error } = await supabase
-    .from('order_items')
-    .insert(newItem)
-    .select(`
-      *,
-      products (title, image, category)
-    `)
-    .single()
-
+  const { data, error } = await supabase.from('order_items').insert(newItem).select(`*, products (title, image, category)`).single()
   if (!error && data) {
     selectedOrder.value.order_items.push(data)
     await recalculateTotal()
@@ -213,8 +181,6 @@ const addItemToOrder = async (product: any) => {
     toastStore.showToast('خطا در افزودن محصول', 'error')
   }
 }
-
-// --- Helpers ---
 
 const getStatusLabel = (status: string) => {
   const map: Record<string, string> = {
@@ -241,6 +207,11 @@ const getStatusColor = (status: string) => {
   }
   return map[status] || 'bg-gray-100'
 }
+
+const getSelectedMethodType = computed(() => {
+  const method = settingsStore.shippingMethods.find(m => m.id === statusForm.value.shipping_method_id)
+  return method?.type || 'post'
+})
 </script>
 
 <template>
@@ -313,27 +284,9 @@ const getStatusColor = (status: string) => {
 
         <!-- Tabs -->
         <div class="flex border-b border-stone-200 bg-stone-50 shrink-0">
-          <button 
-            @click="activeTab = 'status'"
-            class="flex-1 py-3 text-sm font-bold transition border-b-2"
-            :class="activeTab === 'status' ? 'border-stone-900 text-stone-900 bg-white' : 'border-transparent text-stone-500 hover:bg-stone-100'"
-          >
-            وضعیت و پرداخت
-          </button>
-          <button 
-            @click="activeTab = 'items'"
-            class="flex-1 py-3 text-sm font-bold transition border-b-2"
-            :class="activeTab === 'items' ? 'border-stone-900 text-stone-900 bg-white' : 'border-transparent text-stone-500 hover:bg-stone-100'"
-          >
-            اقلام سفارش
-          </button>
-          <button 
-            @click="activeTab = 'shipping'"
-            class="flex-1 py-3 text-sm font-bold transition border-b-2"
-            :class="activeTab === 'shipping' ? 'border-stone-900 text-stone-900 bg-white' : 'border-transparent text-stone-500 hover:bg-stone-100'"
-          >
-            اطلاعات ارسال
-          </button>
+          <button @click="activeTab = 'status'" class="flex-1 py-3 text-sm font-bold transition border-b-2" :class="activeTab === 'status' ? 'border-stone-900 text-stone-900 bg-white' : 'border-transparent text-stone-500 hover:bg-stone-100'">وضعیت و پرداخت</button>
+          <button @click="activeTab = 'items'" class="flex-1 py-3 text-sm font-bold transition border-b-2" :class="activeTab === 'items' ? 'border-stone-900 text-stone-900 bg-white' : 'border-transparent text-stone-500 hover:bg-stone-100'">اقلام سفارش</button>
+          <button @click="activeTab = 'shipping'" class="flex-1 py-3 text-sm font-bold transition border-b-2" :class="activeTab === 'shipping' ? 'border-stone-900 text-stone-900 bg-white' : 'border-transparent text-stone-500 hover:bg-stone-100'">اطلاعات ارسال</button>
         </div>
         
         <!-- Modal Body -->
@@ -383,24 +336,35 @@ const getStatusColor = (status: string) => {
                 </select>
               </div>
 
-              <!-- Tracking Code Input (Always Visible for flexibility) -->
-              <div class="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
-                <label class="block text-sm font-bold text-indigo-900 mb-2 flex items-center gap-2">
-                  <Truck class="w-4 h-4" />
-                  کد رهگیری پستی / تیپاکس
-                </label>
-                <div class="relative">
-                  <input 
-                    v-model="statusForm.tracking_code" 
-                    type="text" 
-                    placeholder="کد رهگیری را اینجا وارد کنید..." 
-                    class="w-full p-3 pl-10 rounded-xl border border-indigo-200 focus:border-indigo-500 outline-none font-mono dir-ltr bg-white" 
-                  />
-                  <Truck class="w-5 h-5 text-indigo-300 absolute left-3 top-3.5" />
+              <!-- Shipping Method & Tracking -->
+              <div class="bg-indigo-50 p-4 rounded-xl border border-indigo-100 space-y-4">
+                <div>
+                  <label class="block text-sm font-bold text-indigo-900 mb-2 flex items-center gap-2">
+                    <Truck class="w-4 h-4" />
+                    روش ارسال
+                  </label>
+                  <select v-model="statusForm.shipping_method_id" class="w-full p-3 rounded-xl border border-indigo-200 focus:border-indigo-500 outline-none bg-white">
+                    <option :value="null">انتخاب نشده</option>
+                    <option v-for="method in settingsStore.shippingMethods" :key="method.id" :value="method.id">
+                      {{ method.title }} ({{ method.type === 'post' ? 'پستی' : 'پیک/راننده' }})
+                    </option>
+                  </select>
                 </div>
-                <p class="text-xs text-indigo-600 mt-2">
-                  با وارد کردن کد رهگیری و تغییر وضعیت به "ارسال شده"، مشتری می‌تواند سفارش خود را پیگیری کند.
-                </p>
+
+                <div>
+                  <label class="block text-sm font-bold text-indigo-900 mb-2 flex items-center gap-2">
+                    {{ getSelectedMethodType === 'post' ? 'کد رهگیری پستی / تیپاکس' : 'شماره تماس راننده / پیک' }}
+                  </label>
+                  <div class="relative">
+                    <input 
+                      v-model="statusForm.tracking_code" 
+                      type="text" 
+                      :placeholder="getSelectedMethodType === 'post' ? 'کد رهگیری را اینجا وارد کنید...' : 'شماره تماس راننده...'" 
+                      class="w-full p-3 pl-10 rounded-xl border border-indigo-200 focus:border-indigo-500 outline-none font-mono dir-ltr bg-white" 
+                    />
+                    <Truck class="w-5 h-5 text-indigo-300 absolute left-3 top-3.5" />
+                  </div>
+                </div>
               </div>
 
               <button @click="updateStatus" class="w-full bg-stone-900 text-white py-3 rounded-xl font-bold hover:bg-accent transition flex items-center justify-center gap-2">
@@ -415,23 +379,11 @@ const getStatusColor = (status: string) => {
             <div class="relative">
               <label class="block text-sm font-bold text-stone-700 mb-2">افزودن محصول به سفارش</label>
               <div class="relative">
-                <input 
-                  v-model="productSearch"
-                  type="text" 
-                  placeholder="جستجوی محصول..." 
-                  class="w-full pl-10 pr-4 py-3 rounded-xl border border-stone-300 focus:border-stone-900 outline-none"
-                />
+                <input v-model="productSearch" type="text" placeholder="جستجوی محصول..." class="w-full pl-10 pr-4 py-3 rounded-xl border border-stone-300 focus:border-stone-900 outline-none" />
                 <Search class="w-5 h-5 text-stone-400 absolute left-3 top-3.5" />
               </div>
-              
-              <!-- Search Results -->
               <div v-if="filteredProducts.length > 0" class="absolute top-full left-0 right-0 bg-white border border-stone-200 rounded-xl shadow-xl mt-2 z-20 overflow-hidden">
-                <div 
-                  v-for="product in filteredProducts" 
-                  :key="product.id"
-                  @click="addItemToOrder(product)"
-                  class="flex items-center gap-3 p-3 hover:bg-stone-50 cursor-pointer border-b border-stone-50 last:border-0"
-                >
+                <div v-for="product in filteredProducts" :key="product.id" @click="addItemToOrder(product)" class="flex items-center gap-3 p-3 hover:bg-stone-50 cursor-pointer border-b border-stone-50 last:border-0">
                   <img :src="product.image" class="w-10 h-10 rounded-lg object-cover bg-stone-100" />
                   <div class="flex-grow">
                     <div class="font-bold text-sm text-stone-800">{{ product.title }}</div>
@@ -446,28 +398,19 @@ const getStatusColor = (status: string) => {
             <div class="space-y-3">
               <div v-for="item in selectedOrder.order_items" :key="item.id" class="flex items-center gap-3 p-3 border border-stone-200 rounded-xl bg-white">
                 <img :src="item.products?.image" class="w-16 h-16 rounded-lg object-cover bg-stone-100 border border-stone-100 shrink-0" />
-                
                 <div class="flex-grow min-w-0">
                   <div class="font-bold text-stone-800 text-sm truncate">{{ item.products?.title }}</div>
                   <div class="text-xs text-stone-500 mt-1">{{ item.price_at_purchase.toLocaleString() }} تومان</div>
                 </div>
-
                 <div class="flex items-center gap-2 bg-stone-50 rounded-lg border border-stone-200 px-1">
                   <button @click="updateItemQty(item, 1)" class="p-1 hover:text-green-600"><Plus class="w-3 h-3" /></button>
                   <span class="w-6 text-center font-bold text-sm">{{ item.quantity }}</span>
                   <button @click="updateItemQty(item, -1)" class="p-1 hover:text-red-600" :disabled="item.quantity <= 1"><div class="w-2 h-0.5 bg-current"></div></button>
                 </div>
-
-                <div class="font-bold text-sm w-20 text-left">
-                  {{ (item.price_at_purchase * item.quantity).toLocaleString() }}
-                </div>
-
-                <button @click="removeItem(item.id)" class="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition">
-                  <Trash2 class="w-4 h-4" />
-                </button>
+                <div class="font-bold text-sm w-20 text-left">{{ (item.price_at_purchase * item.quantity).toLocaleString() }}</div>
+                <button @click="removeItem(item.id)" class="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"><Trash2 class="w-4 h-4" /></button>
               </div>
             </div>
-
             <div class="bg-stone-50 p-4 rounded-xl flex justify-between items-center border border-stone-200">
               <span class="font-bold text-stone-700">مجموع کل جدید:</span>
               <span class="font-black text-xl text-accent">{{ selectedOrder.total_price.toLocaleString() }} تومان</span>
@@ -483,7 +426,6 @@ const getStatusColor = (status: string) => {
                 <User class="w-5 h-5 text-stone-400 absolute right-3 top-3.5" />
               </div>
             </div>
-
             <div>
               <label class="block text-sm font-bold text-stone-700 mb-2">شماره تماس</label>
               <div class="relative">
@@ -491,7 +433,6 @@ const getStatusColor = (status: string) => {
                 <Phone class="w-5 h-5 text-stone-400 absolute right-3 top-3.5" />
               </div>
             </div>
-
             <div>
               <label class="block text-sm font-bold text-stone-700 mb-2">آدرس کامل پستی</label>
               <div class="relative">
@@ -499,7 +440,6 @@ const getStatusColor = (status: string) => {
                 <MapPin class="w-5 h-5 text-stone-400 absolute right-3 top-3.5" />
               </div>
             </div>
-
             <button @click="saveShippingInfo" class="w-full bg-stone-900 text-white py-3 rounded-xl font-bold hover:bg-accent transition flex items-center justify-center gap-2">
               <Save class="w-4 h-4" /> ذخیره اطلاعات ارسال
             </button>
@@ -509,9 +449,7 @@ const getStatusColor = (status: string) => {
 
         <!-- Modal Footer -->
         <div class="p-4 border-t border-stone-100 bg-stone-50 flex justify-end">
-          <button @click="showModal = false" class="bg-white border border-stone-300 text-stone-700 px-6 py-2.5 rounded-xl font-bold hover:bg-stone-100 transition">
-            بستن پنجره
-          </button>
+          <button @click="showModal = false" class="bg-white border border-stone-300 text-stone-700 px-6 py-2.5 rounded-xl font-bold hover:bg-stone-100 transition">بستن پنجره</button>
         </div>
       </div>
     </div>
