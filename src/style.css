@@ -15,6 +15,38 @@ body {
   overflow-x: hidden;
 }
 
+/* --- اصلاحات رابط کاربری (UI Fixes) --- */
+
+/* 1. حل مشکل نشانگر موس روی تمام دکمه‌ها و لینک‌ها */
+button, 
+a, 
+[role="button"],
+input[type="submit"],
+input[type="button"] {
+  cursor: pointer !important;
+}
+
+/* 2. ایجاد فیدبک بصری هنگام کلیک (Active State) */
+/* وقتی روی دکمه کلیک می‌شود، کمی کوچک شود تا حس کلیک منتقل شود */
+button:active, 
+a:active {
+  transform: scale(0.96);
+  transition: transform 0.1s ease;
+}
+
+/* جلوگیری از انتخاب متن هنگام کلیک‌های سریع */
+button {
+  user-select: none;
+}
+
+/* رفع باگ دکمه‌های غیرفعال */
+button:disabled,
+button[disabled] {
+  cursor: not-allowed !important;
+  opacity: 0.6;
+  transform: none !important; /* دکمه غیرفعال نباید انیمیشن داشته باشد */
+}
+
 /* اسکرول نرم */
 html {
   scroll-behavior: smooth;
