@@ -24,18 +24,22 @@ export const useSettingsStore = defineStore('settings', () => {
   
   const shippingMethods = ref<ShippingMethod[]>([])
   const loading = ref(false)
+  const isLoaded = ref(false) // وضعیت لود شدن تنظیمات
 
   // دریافت تنظیمات کلی
   const fetchSettings = async () => {
+    if (isLoaded.value) return // اگر قبلا لود شده، دوباره نگیر
+
     loading.value = true
     try {
       const { data, error } = await supabase
         .from('site_settings')
         .select('*')
-        .maybeSingle() // Use maybeSingle to avoid error on empty table
+        .maybeSingle()
 
       if (data && !error) {
         settings.value = { ...settings.value, ...data }
+        isLoaded.value = true
       } else if (error) {
         console.error('Error fetching settings:', error)
       }
@@ -49,31 +53,26 @@ export const useSettingsStore = defineStore('settings', () => {
   // ذخیره تنظیمات کلی
   const updateSettings = async (newSettings: any) => {
     loading.value = true
-    console.log('Store: Updating settings...', newSettings)
     
     try {
-      // Check if row exists
       const { data: existing, error: fetchError } = await supabase
         .from('site_settings')
         .select('id')
         .maybeSingle()
 
       if (fetchError) {
-        console.error('Store: Error checking existing settings:', fetchError)
         loading.value = false
         return fetchError
       }
 
       let error
       if (existing) {
-        console.log('Store: Updating existing row ID:', existing.id)
         const { error: updateError } = await supabase
           .from('site_settings')
           .update(newSettings)
           .eq('id', existing.id)
         error = updateError
       } else {
-        console.log('Store: Inserting new settings row')
         const { error: insertError } = await supabase
           .from('site_settings')
           .insert([newSettings])
@@ -82,15 +81,12 @@ export const useSettingsStore = defineStore('settings', () => {
 
       if (!error) {
         settings.value = { ...settings.value, ...newSettings }
-        console.log('Store: Settings updated successfully')
-      } else {
-        console.error('Store: Supabase update error:', error)
+        isLoaded.value = true // تنظیمات جدید معتبر هستند
       }
       
       loading.value = false
       return error
     } catch (err: any) {
-      console.error('Store: Exception in updateSettings:', err)
       loading.value = false
       return { message: err.message || 'Unknown error' }
     }
@@ -155,6 +151,7 @@ export const useSettingsStore = defineStore('settings', () => {
     settings, 
     shippingMethods, 
     loading, 
+    isLoaded,
     fetchSettings, 
     updateSettings,
     fetchShippingMethods,

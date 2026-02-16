@@ -3,7 +3,6 @@ import { ShoppingCart, Heart, Eye } from 'lucide-vue-next'
 import { useCartStore } from '@/stores/cart'
 import { useSettingsStore } from '@/stores/settings'
 import { useRouter } from 'vue-router'
-import { onMounted } from 'vue'
 
 const props = defineProps<{
   product: {
@@ -22,22 +21,24 @@ const cartStore = useCartStore()
 const settingsStore = useSettingsStore()
 const router = useRouter()
 
-onMounted(() => {
-  // اطمینان از لود شدن تنظیمات
-  if (!settingsStore.settings.product_url_type) {
-    settingsStore.fetchSettings()
-  }
-})
-
 const addToCart = (e: Event) => {
   e.stopPropagation()
   e.preventDefault()
   cartStore.addItem(props.product)
 }
 
-const goToDetail = () => {
+const goToDetail = async () => {
+  // اگر تنظیمات هنوز لود نشده، منتظر بمان
+  if (!settingsStore.isLoaded) {
+    await settingsStore.fetchSettings()
+  }
+
   const urlType = settingsStore.settings.product_url_type || 'id'
+  
+  // اگر تنظیم روی اسلاگ بود و محصول اسلاگ داشت، از اسلاگ استفاده کن
+  // در غیر این صورت از ID استفاده کن
   const param = (urlType === 'slug' && props.product.slug) ? props.product.slug : props.product.id
+  
   router.push({ name: 'product-detail', params: { id: param } })
 }
 </script>

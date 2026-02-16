@@ -6,15 +6,19 @@ import { useRoute } from 'vue-router'
 import { useHead } from '@vueuse/head'
 import { onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
+import { useSettingsStore } from '@/stores/settings'
 
 const route = useRoute()
 const authStore = useAuthStore()
+const settingsStore = useSettingsStore()
 
-// شروع احراز هویت در پس‌زمینه به محض لود شدن برنامه
+// شروع احراز هویت و دریافت تنظیمات در پس‌زمینه به محض لود شدن برنامه
 onMounted(() => {
   if (!authStore.isInitialized) {
     authStore.initializeAuth()
   }
+  // دریافت تنظیمات سایت (مثل نوع URL)
+  settingsStore.fetchSettings()
 })
 
 useHead({

@@ -1,11 +1,17 @@
 <script setup lang="ts">
+import { ref, onMounted } from 'vue'
 import { ArrowLeft, ArrowDown, Star, Play, Leaf, ShieldCheck, Truck } from 'lucide-vue-next'
 import ProductCard from '@/components/ProductCard.vue'
 import { useHead } from '@vueuse/head'
+import { useProductStore } from '@/stores/product'
+
+const productStore = useProductStore()
+const featuredProducts = ref<any[]>([])
+const loadingFeatured = ref(true)
 
 // تنظیمات سئو صفحه اصلی
 useHead({
-  title: 'خانه', // به صورت خودکار تبدیل می‌شود به: خانه | فروشگاه حصیرباف
+  title: 'خانه',
   meta: [
     { name: 'description', content: 'فروشگاه اینترنتی حصیرباف، عرضه کننده مستقیم انواع سبد، گلدان، زیرانداز و محصولات دکوراتیو حصیری با بهترین کیفیت و قیمت.' },
     { property: 'og:title', content: 'فروشگاه صنایع دستی حصیری | هنر دست‌بافت طبیعت' },
@@ -14,39 +20,18 @@ useHead({
   ]
 })
 
-// داده‌های محصولات با تصاویر واقعی و تست شده
-const featuredProducts = [
-  { 
-    id: 1, 
-    title: 'سبد حصیری مدل آوا', 
-    price: 450000, 
-    category: 'سبد', 
-    image: 'https://images.unsplash.com/photo-1595867627368-2354583e56b6?auto=format&fit=crop&q=80&w=600', 
-    isNew: true 
-  },
-  { 
-    id: 2, 
-    title: 'گلدان پایه دار بامبو', 
-    price: 280000, 
-    category: 'گلدان', 
-    image: 'https://images.unsplash.com/photo-1616486338812-3dadae4b4f9d?auto=format&fit=crop&q=80&w=600', 
-    discount: 10 
-  },
-  { 
-    id: 3, 
-    title: 'لوستر حصیری روستیک', 
-    price: 850000, 
-    category: 'دکوراتیو', 
-    image: 'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&q=80&w=600' 
-  },
-  { 
-    id: 4, 
-    title: 'باکس نظم دهنده', 
-    price: 120000, 
-    category: 'نظم دهنده', 
-    image: 'https://images.unsplash.com/photo-1584589167171-541ce45f1eea?auto=format&fit=crop&q=80&w=600' 
-  },
-]
+onMounted(async () => {
+  // دریافت محصولات ویژه واقعی از دیتابیس
+  const products = await productStore.fetchFeaturedProducts()
+  if (products && products.length > 0) {
+    featuredProducts.value = products
+  } else {
+    // اگر محصول ویژه‌ای نبود، آخرین محصولات را بگیر
+    await productStore.fetchProducts()
+    featuredProducts.value = productStore.products.slice(0, 4)
+  }
+  loadingFeatured.value = false
+})
 </script>
 
 <template>
@@ -69,7 +54,6 @@ const featuredProducts = [
             
             <h1 class="text-5xl md:text-7xl lg:text-8xl font-black text-stone-900 leading-[0.95] tracking-tighter animate-slide-up delay-200">
               هنرِ <br/>
-              <!-- اصلاح فونت: استفاده از فونت وزیرمتن با وزن کمتر برای تمایز -->
               <span class="text-stone-500 font-light pr-2 font-sans">دست‌بافت</span> <br/>
               طبیعت
             </h1>
@@ -91,14 +75,13 @@ const featuredProducts = [
 
           <!-- Hero Image Composition -->
           <div class="lg:col-span-7 relative h-[600px] hidden md:block">
-            <!-- Main Image (لینک جدید شما) -->
+            <!-- Main Image -->
             <div class="absolute top-10 right-10 w-[450px] h-[550px] rounded-t-[250px] rounded-b-[40px] overflow-hidden shadow-2xl animate-float z-10">
               <img src="https://plus.unsplash.com/premium_photo-1661436362044-50ccd76c690c?q=80&w=687&auto=format&fit=crop" class="w-full h-full object-cover hover:scale-105 transition duration-1000" alt="Hero Main">
-              <!-- Overlay Gradient -->
               <div class="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
             </div>
             
-            <!-- Floating Card 1 (Social Proof) -->
+            <!-- Floating Card 1 -->
             <div class="absolute bottom-24 right-[400px] bg-white/90 backdrop-blur-md p-5 rounded-2xl shadow-xl max-w-[220px] animate-slide-up delay-500 z-20 border border-white/50">
               <div class="flex items-center gap-2 mb-3">
                 <div class="flex -space-x-3 space-x-reverse">
@@ -111,7 +94,7 @@ const featuredProducts = [
               <p class="text-xs text-stone-500 leading-tight">رضایت مشتریان ما اعتبار ماست. به خانواده بزرگ حصیرباف بپیوندید.</p>
             </div>
 
-            <!-- Floating Card 2 (Product Teaser - لینک دوم شما) -->
+            <!-- Floating Card 2 -->
             <div class="absolute top-20 -left-8 bg-white p-4 rounded-2xl shadow-2xl animate-float delay-700 z-0 rotate-[-6deg] hover:rotate-0 transition duration-500">
               <img src="https://images.unsplash.com/photo-1641559564912-971904fc74da?q=80&w=687&auto=format&fit=crop" class="w-40 h-40 object-cover rounded-xl mb-3">
               <div class="flex justify-between items-center">
@@ -126,13 +109,12 @@ const featuredProducts = [
         </div>
       </div>
       
-      <!-- Scroll Indicator -->
       <div class="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce hidden md:block cursor-pointer opacity-50 hover:opacity-100 transition">
         <ArrowDown class="w-6 h-6 text-stone-800" />
       </div>
     </section>
 
-    <!-- 2. MARQUEE (Infinite Scroll) -->
+    <!-- 2. MARQUEE -->
     <div class="bg-stone-900 py-8 overflow-hidden whitespace-nowrap relative -rotate-1 scale-105 my-12 shadow-2xl z-20">
       <div class="inline-block animate-marquee">
         <span class="text-stone-500 text-3xl font-black mx-12 uppercase tracking-widest">صنایع دستی اصیل</span>
@@ -141,12 +123,10 @@ const featuredProducts = [
         <span class="text-white text-3xl font-serif mx-12 italic">Organic Materials</span>
         <span class="text-stone-500 text-3xl font-black mx-12 uppercase tracking-widest">ضمانت بازگشت</span>
         <span class="text-white text-3xl font-serif mx-12 italic">Sustainable Design</span>
-        <span class="text-stone-500 text-3xl font-black mx-12 uppercase tracking-widest">صنایع دستی اصیل</span>
-        <span class="text-white text-3xl font-serif mx-12 italic">Handmade with Love</span>
       </div>
     </div>
 
-    <!-- 3. BENTO GRID CATEGORIES -->
+    <!-- 3. BENTO GRID -->
     <section class="py-24 container mx-auto px-4 md:px-8">
       <div class="flex flex-col md:flex-row justify-between items-end mb-12">
         <div>
@@ -160,7 +140,6 @@ const featuredProducts = [
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-4 grid-rows-2 gap-6 h-[700px]">
-        <!-- Large Item (دکوراسیون داخلی) -->
         <div class="md:col-span-2 md:row-span-2 relative group overflow-hidden rounded-[40px] cursor-pointer shadow-lg">
           <img src="https://images.unsplash.com/photo-1616046229478-9901c5536a45?auto=format&fit=crop&q=80&w=800" class="w-full h-full object-cover transition duration-700 group-hover:scale-110" alt="Living Room">
           <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-80 group-hover:opacity-100 transition duration-500"></div>
@@ -170,7 +149,6 @@ const featuredProducts = [
           </div>
         </div>
         
-        <!-- Medium Item (سبد و باکس - اصلاح شده) -->
         <div class="md:col-span-1 md:row-span-2 relative group overflow-hidden rounded-[40px] cursor-pointer shadow-lg">
           <img src="https://images.unsplash.com/photo-1595867627368-2354583e56b6?auto=format&fit=crop&q=80&w=600" class="w-full h-full object-cover transition duration-700 group-hover:scale-110" alt="Baskets">
           <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
@@ -180,7 +158,6 @@ const featuredProducts = [
           </div>
         </div>
 
-        <!-- Small Item 1 (گلدان - اصلاح شده) -->
         <div class="relative group overflow-hidden rounded-[40px] cursor-pointer shadow-lg">
           <img src="https://images.unsplash.com/photo-1463320898484-cdee8141c787?auto=format&fit=crop&q=80&w=400" class="w-full h-full object-cover transition duration-700 group-hover:scale-110" alt="Plants">
           <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
@@ -189,7 +166,6 @@ const featuredProducts = [
           </div>
         </div>
 
-        <!-- Small Item 2 (CTA) -->
         <div class="relative group overflow-hidden rounded-[40px] cursor-pointer bg-accent text-white flex flex-col justify-center items-center text-center p-6 shadow-lg hover:bg-accent-dark transition duration-300">
           <div class="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center mb-4 text-3xl animate-pulse">✨</div>
           <h3 class="text-2xl font-bold mb-2">کالکشن جدید</h3>
@@ -199,7 +175,7 @@ const featuredProducts = [
       </div>
     </section>
 
-    <!-- 4. FEATURED PRODUCTS -->
+    <!-- 4. FEATURED PRODUCTS (Dynamic) -->
     <section class="py-24 bg-white rounded-t-[80px] relative z-10 shadow-[0_-20px_60px_rgba(0,0,0,0.05)]">
       <div class="container mx-auto px-4 md:px-8">
         <div class="text-center max-w-3xl mx-auto mb-20">
@@ -208,7 +184,11 @@ const featuredProducts = [
           <p class="text-stone-500 text-lg">محصولاتی که بیشترین طرفدار را در بین مشتریان خوش‌سلیقه ما داشته‌اند.</p>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10">
+        <div v-if="loadingFeatured" class="flex justify-center py-12">
+          <div class="w-10 h-10 border-4 border-stone-200 border-t-stone-900 rounded-full animate-spin"></div>
+        </div>
+
+        <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10">
           <ProductCard v-for="product in featuredProducts" :key="product.id" :product="product" />
         </div>
         
@@ -220,7 +200,7 @@ const featuredProducts = [
       </div>
     </section>
 
-    <!-- 5. FEATURES (Icons) -->
+    <!-- 5. FEATURES -->
     <section class="py-20 bg-stone-50 border-b border-stone-200">
       <div class="container mx-auto px-4">
         <div class="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
@@ -256,9 +236,8 @@ const featuredProducts = [
       </div>
     </section>
 
-    <!-- 6. STORY SECTION (Immersive) -->
+    <!-- 6. STORY SECTION -->
     <section class="py-32 bg-stone-900 text-stone-100 relative overflow-hidden">
-      <!-- Decorative Elements -->
       <div class="absolute -top-40 -left-40 w-[600px] h-[600px] bg-stone-800 rounded-full blur-[100px] opacity-40"></div>
       <div class="absolute bottom-0 right-0 w-[400px] h-[400px] bg-accent/20 rounded-full blur-[100px] opacity-30"></div>
       
@@ -288,14 +267,6 @@ const featuredProducts = [
           <div class="relative group">
             <div class="absolute inset-0 bg-accent rounded-[50px] rotate-6 group-hover:rotate-3 transition duration-500 opacity-20"></div>
             <img src="https://images.unsplash.com/photo-1459411552884-841db9b3cc2a?auto=format&fit=crop&q=80&w=800" class="relative rounded-[50px] rotate-3 group-hover:rotate-0 transition duration-700 shadow-2xl border-4 border-stone-800 grayscale group-hover:grayscale-0" alt="Weaving">
-            
-            <div class="absolute -bottom-10 -right-10 bg-stone-100 text-stone-900 p-8 rounded-3xl shadow-xl max-w-xs hidden md:block animate-float delay-300">
-              <div class="flex gap-1 text-yellow-500 mb-3">
-                <Star class="w-5 h-5 fill-current" v-for="i in 5" :key="i" />
-              </div>
-              <p class="text-base font-bold italic leading-relaxed">"کیفیت محصولات فوق‌العاده است. حس طبیعت رو کاملا منتقل میکنه."</p>
-              <p class="text-sm text-stone-500 mt-4 text-left font-bold">- سارا م.</p>
-            </div>
           </div>
         </div>
       </div>
