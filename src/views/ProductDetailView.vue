@@ -3,12 +3,14 @@ import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { supabase } from '@/lib/supabase'
 import { useCartStore } from '@/stores/cart'
+import { useSettingsStore } from '@/stores/settings'
 import { ShoppingCart, ArrowRight, Star, Truck, ShieldCheck, Heart } from 'lucide-vue-next'
 import ProductComments from '@/components/product/ProductComments.vue'
 
 const route = useRoute()
 const router = useRouter()
 const cartStore = useCartStore()
+const settingsStore = useSettingsStore()
 
 const product = ref<any>(null)
 const loading = ref(true)
@@ -20,11 +22,17 @@ onMounted(async () => {
 
   loading.value = true
   
+  // اطمینان از لود شدن تنظیمات برای تصمیم‌گیری در مورد URL
+  if (!settingsStore.isLoaded) {
+    await settingsStore.fetchSettings()
+  }
+
   let query = supabase.from('products').select('*')
   
-  // تشخیص اینکه پارامتر ID است یا Slug
-  // اگر تماماً عدد باشد، فرض می‌کنیم ID است
-  if (/^\d+$/.test(param)) {
+  // تشخیص اینکه پارامتر ID است یا Slug برای پیدا کردن محصول در دیتابیس
+  const isParamId = /^\d+$/.test(param)
+  
+  if (isParamId) {
     query = query.eq('id', param)
   } else {
     query = query.eq('slug', param)
@@ -35,9 +43,24 @@ onMounted(async () => {
   if (data) {
     product.value = data
     selectedImage.value = data.image
+
+    // --- لاجیک اجبار نوع URL (Redirect) ---
+    const urlType = settingsStore.settings.product_url_type || 'id'
+    
+    // حالت ۱: تنظیمات روی ID است، اما کاربر با Slug وارد شده است
+    if (urlType === 'id' && !isParamId) {
+      router.replace({ name: 'product-detail', params: { id: data.id } })
+      return
+    }
+
+    // حالت ۲: تنظیمات روی Slug است، اما کاربر با ID وارد شده است (و محصول اسلاگ دارد)
+    if (urlType === 'slug' && isParamId && data.slug) {
+      router.replace({ name: 'product-detail', params: { id: data.slug } })
+      return
+    }
+    // --------------------------------------
+
   } else {
-    // اگر با Slug پیدا نشد، شاید کاربر ID وارد کرده ولی به صورت رشته
-    // یا محصول وجود ندارد
     router.push('/products')
   }
   loading.value = false
