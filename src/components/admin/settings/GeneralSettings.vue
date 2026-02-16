@@ -2,10 +2,11 @@
 import { ref, onMounted } from 'vue'
 import { useSettingsStore } from '@/stores/settings'
 import { useToastStore } from '@/stores/toast'
-import { Save, Globe, Link } from 'lucide-vue-next'
+import { Save, Globe, Link, Loader2 } from 'lucide-vue-next'
 
 const settingsStore = useSettingsStore()
 const toastStore = useToastStore()
+const saving = ref(false)
 
 const form = ref({
   product_url_type: 'id' // 'id' | 'slug'
@@ -17,14 +18,26 @@ onMounted(async () => {
 })
 
 const saveSettings = async () => {
-  const error = await settingsStore.updateSettings({
-    product_url_type: form.value.product_url_type
-  })
+  console.log('Save button clicked. Data:', form.value)
+  saving.value = true
   
-  if (!error) {
-    toastStore.showToast('تنظیمات عمومی ذخیره شد', 'success')
-  } else {
-    toastStore.showToast('خطا در ذخیره تنظیمات', 'error')
+  try {
+    const error = await settingsStore.updateSettings({
+      product_url_type: form.value.product_url_type
+    })
+    
+    console.log('Update result error:', error)
+
+    if (!error) {
+      toastStore.showToast('تنظیمات عمومی با موفقیت ذخیره شد', 'success')
+    } else {
+      toastStore.showToast('خطا در ذخیره تنظیمات: ' + (error.message || error), 'error')
+    }
+  } catch (e: any) {
+    console.error('Unexpected error in saveSettings:', e)
+    toastStore.showToast('خطای غیرمنتظره: ' + e.message, 'error')
+  } finally {
+    saving.value = false
   }
 }
 </script>
@@ -44,7 +57,7 @@ const saveSettings = async () => {
       </h4>
       
       <div class="space-y-4">
-        <label class="flex items-start gap-3 p-4 bg-white border border-stone-200 rounded-xl cursor-pointer hover:border-indigo-300 transition">
+        <label class="flex items-start gap-3 p-4 bg-white border border-stone-200 rounded-xl cursor-pointer hover:border-indigo-300 transition relative overflow-hidden" :class="form.product_url_type === 'id' ? 'border-indigo-500 ring-1 ring-indigo-500' : ''">
           <input type="radio" v-model="form.product_url_type" value="id" class="mt-1 accent-indigo-600" />
           <div>
             <span class="font-bold text-stone-800 block mb-1">استفاده از شناسه (ID)</span>
@@ -53,7 +66,7 @@ const saveSettings = async () => {
           </div>
         </label>
 
-        <label class="flex items-start gap-3 p-4 bg-white border border-stone-200 rounded-xl cursor-pointer hover:border-indigo-300 transition">
+        <label class="flex items-start gap-3 p-4 bg-white border border-stone-200 rounded-xl cursor-pointer hover:border-indigo-300 transition relative overflow-hidden" :class="form.product_url_type === 'slug' ? 'border-indigo-500 ring-1 ring-indigo-500' : ''">
           <input type="radio" v-model="form.product_url_type" value="slug" class="mt-1 accent-indigo-600" />
           <div>
             <span class="font-bold text-stone-800 block mb-1">استفاده از نامک (Slug)</span>
@@ -66,11 +79,15 @@ const saveSettings = async () => {
 
     <div class="pt-4 border-t border-stone-100">
       <button 
+        type="button"
         @click="saveSettings" 
-        class="bg-stone-900 text-white px-8 py-3 rounded-xl font-bold hover:bg-accent transition flex items-center gap-2 shadow-lg shadow-stone-900/20"
+        :disabled="saving"
+        class="bg-stone-900 text-white px-8 py-3 rounded-xl font-bold hover:bg-accent transition flex items-center gap-2 shadow-lg shadow-stone-900/20 disabled:opacity-70 disabled:cursor-not-allowed"
       >
-        <Save class="w-4 h-4" />
-        ذخیره تغییرات
+        <Loader2 v-if="saving" class="w-4 h-4 animate-spin" />
+        <Save v-else class="w-4 h-4" />
+        <span v-if="saving">در حال ذخیره...</span>
+        <span v-else>ذخیره تغییرات</span>
       </button>
     </div>
   </div>

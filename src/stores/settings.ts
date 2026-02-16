@@ -28,41 +28,72 @@ export const useSettingsStore = defineStore('settings', () => {
   // دریافت تنظیمات کلی
   const fetchSettings = async () => {
     loading.value = true
-    const { data, error } = await supabase
-      .from('site_settings')
-      .select('*')
-      .single()
+    try {
+      const { data, error } = await supabase
+        .from('site_settings')
+        .select('*')
+        .maybeSingle() // Use maybeSingle to avoid error on empty table
 
-    if (data && !error) {
-      settings.value = { ...settings.value, ...data }
+      if (data && !error) {
+        settings.value = { ...settings.value, ...data }
+      } else if (error) {
+        console.error('Error fetching settings:', error)
+      }
+    } catch (e) {
+      console.error('Exception fetching settings:', e)
+    } finally {
+      loading.value = false
     }
-    loading.value = false
   }
 
   // ذخیره تنظیمات کلی
   const updateSettings = async (newSettings: any) => {
     loading.value = true
-    const { data: existing } = await supabase.from('site_settings').select('id').single()
-
-    let error
-    if (existing) {
-      const { error: updateError } = await supabase
+    console.log('Store: Updating settings...', newSettings)
+    
+    try {
+      // Check if row exists
+      const { data: existing, error: fetchError } = await supabase
         .from('site_settings')
-        .update(newSettings)
-        .eq('id', existing.id)
-      error = updateError
-    } else {
-      const { error: insertError } = await supabase
-        .from('site_settings')
-        .insert([newSettings])
-      error = insertError
-    }
+        .select('id')
+        .maybeSingle()
 
-    if (!error) {
-      settings.value = { ...settings.value, ...newSettings }
+      if (fetchError) {
+        console.error('Store: Error checking existing settings:', fetchError)
+        loading.value = false
+        return fetchError
+      }
+
+      let error
+      if (existing) {
+        console.log('Store: Updating existing row ID:', existing.id)
+        const { error: updateError } = await supabase
+          .from('site_settings')
+          .update(newSettings)
+          .eq('id', existing.id)
+        error = updateError
+      } else {
+        console.log('Store: Inserting new settings row')
+        const { error: insertError } = await supabase
+          .from('site_settings')
+          .insert([newSettings])
+        error = insertError
+      }
+
+      if (!error) {
+        settings.value = { ...settings.value, ...newSettings }
+        console.log('Store: Settings updated successfully')
+      } else {
+        console.error('Store: Supabase update error:', error)
+      }
+      
+      loading.value = false
+      return error
+    } catch (err: any) {
+      console.error('Store: Exception in updateSettings:', err)
+      loading.value = false
+      return { message: err.message || 'Unknown error' }
     }
-    loading.value = false
-    return error
   }
 
   // --- Shipping Methods ---
