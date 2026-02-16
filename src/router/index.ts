@@ -68,39 +68,35 @@ export const routes: RouteRecordRaw[] = [
   }
 ]
  
-export const createRouterInstance = () => {
-  const router = createRouter({
-    history: createWebHistory(import.meta.env.BASE_URL),
-    routes
-  })
+const router = createRouter({
+  history: createWebHistory(import.meta.env.BASE_URL),
+  routes,
+  scrollBehavior(to, from, savedPosition) {
+    if (savedPosition) return savedPosition
+    return { top: 0 }
+  }
+})
 
-  // --- FIX: مدیریت خطاهای ناگهانی روتر ---
-  router.onError((error) => {
-    const targetPath = router.currentRoute.value.fullPath
-    
-    // 1. اگر خطا مربوط به لود نشدن فایل‌های JS/CSS باشد (ورژن جدید دیپلوی شده)
-    if (error.message.includes('Failed to fetch') || error.message.includes('Importing a module script failed')) {
-      if (!targetPath) return
-      // صفحه را ریلود کن تا فایل‌های جدید را بگیرد
-      window.location.reload()
-    }
-    
-    // 2. نادیده گرفتن خطای AbortError که باعث فریز شدن می‌شود
-    if (error.name === 'AbortError' || error.message.includes('aborted')) {
-      console.warn('Navigation aborted (benign error):', error)
-      return // جلوگیری از پرتاب خطا به بالا
-    }
-  })
+// --- FIX: مدیریت خطاهای ناگهانی روتر ---
+router.onError((error) => {
+  const targetPath = router.currentRoute.value.fullPath
+  
+  // 1. اگر خطا مربوط به لود نشدن فایل‌های JS/CSS باشد (ورژن جدید دیپلوی شده)
+  if (error.message.includes('Failed to fetch') || error.message.includes('Importing a module script failed')) {
+    if (!targetPath) return
+    // صفحه را ریلود کن تا فایل‌های جدید را بگیرد
+    window.location.reload()
+  }
+  
+  // 2. نادیده گرفتن خطای AbortError که باعث فریز شدن می‌شود
+  if (error.name === 'AbortError' || error.message.includes('aborted')) {
+    console.warn('Navigation aborted (benign error):', error)
+    return // جلوگیری از پرتاب خطا به بالا
+  }
+})
 
-  return router
-}
- 
-export const setupGuards = (router: any) => {
-  router.beforeEach(async (to: any, from: any, next: any) => {
-    if (import.meta.env.SSR) {
-      return next()
-    }
- 
+export const setupGuards = (routerInstance: any) => {
+  routerInstance.beforeEach(async (to: any, from: any, next: any) => {
     const authStore = useAuthStore()
     
     if (!authStore.session) {
@@ -116,3 +112,5 @@ export const setupGuards = (router: any) => {
     }
   })
 }
+
+export default router

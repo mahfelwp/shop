@@ -1,13 +1,15 @@
-import { ViteSSG } from 'vite-ssg'
+import { createApp } from 'vue'
 import { createPinia } from 'pinia'
+import { createHead } from '@vueuse/head'
 import App from './App.vue'
-import { routes, setupGuards } from './router'
+import router from './router'
+import { setupGuards } from './router'
 import './style.css'
 
 // --- FIX: جلوگیری از کرش کردن برنامه با خطاهای هندل نشده ---
 if (typeof window !== 'undefined') {
   window.addEventListener('unhandledrejection', (event) => {
-    // اگر خطا AbortError بود، آن را نادیده بگیر تا کنسول قرمز نشود و برنامه متوقف نشود
+    // اگر خطا AbortError بود، آن را نادیده بگیر
     if (event.reason && (event.reason.name === 'AbortError' || event.reason.message?.includes('aborted'))) {
       event.preventDefault()
       console.debug('Suppressed AbortError in main.ts')
@@ -15,25 +17,19 @@ if (typeof window !== 'undefined') {
   })
 }
 
-export const createApp = ViteSSG(
-  App,
-  { 
-    routes,
-    scrollBehavior(to, from, savedPosition) {
-      if (savedPosition) return savedPosition
-      return { top: 0 }
-    }
-  },
-  ({ app, router, routes, isClient, initialState }) => {
-    const pinia = createPinia()
-    app.use(pinia)
-    
-    if (isClient) {
-      setupGuards(router)
-      
-      router.isReady().then(() => {
-        console.log('Router is ready')
-      })
-    }
-  }
-)
+const app = createApp(App)
+const pinia = createPinia()
+const head = createHead()
+
+app.use(pinia)
+app.use(router)
+app.use(head)
+
+// راه اندازی گاردهای روتر (Auth Guards)
+setupGuards(router)
+
+// مانت کردن برنامه پس از آماده شدن روتر
+router.isReady().then(() => {
+  app.mount('#app')
+  console.log('SPA App Mounted')
+})
