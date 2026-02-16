@@ -29,7 +29,14 @@ app.use(head)
 setupGuards(router)
 
 // مانت کردن برنامه پس از آماده شدن روتر
-router.isReady().then(() => {
-  app.mount('#app')
-  console.log('SPA App Mounted')
-})
+// از .catch استفاده می‌کنیم تا اگر روتر به هر دلیلی آماده نشد، باز هم برنامه مانت شود
+router.isReady()
+  .then(() => {
+    app.mount('#app')
+    console.log('SPA App Mounted Successfully')
+  })
+  .catch((err) => {
+    console.error('Router isReady failed:', err)
+    // تلاش برای مانت اضطراری
+    app.mount('#app')
+  })

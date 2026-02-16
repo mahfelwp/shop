@@ -84,6 +84,7 @@ const router = createRouter({
 // --- FIX: مدیریت خطاهای ناگهانی روتر ---
 router.onError((error) => {
   const targetPath = router.currentRoute.value.fullPath
+  console.error('Router Error:', error)
   
   // 1. اگر خطا مربوط به لود نشدن فایل‌های JS/CSS باشد (ورژن جدید دیپلوی شده)
   if (error.message.includes('Failed to fetch') || error.message.includes('Importing a module script failed')) {
@@ -91,28 +92,28 @@ router.onError((error) => {
     // صفحه را ریلود کن تا فایل‌های جدید را بگیرد
     window.location.reload()
   }
-  
-  // 2. نادیده گرفتن خطای AbortError که باعث فریز شدن می‌شود
-  if (error.name === 'AbortError' || error.message.includes('aborted')) {
-    console.warn('Navigation aborted (benign error):', error)
-    return // جلوگیری از پرتاب خطا به بالا
-  }
 })
 
 export const setupGuards = (routerInstance: any) => {
   routerInstance.beforeEach(async (to: any, from: any, next: any) => {
     const authStore = useAuthStore()
     
-    if (!authStore.session) {
-      await authStore.initializeAuth()
-    }
- 
-    if (to.meta.requiresAuth && !authStore.user) {
-      next({ name: 'login' })
-    } else if (to.meta.requiresAdmin && !authStore.isAdmin) {
-      next({ name: 'home' }) 
-    } else {
-      next()
+    try {
+      if (!authStore.session) {
+        // تلاش برای احراز هویت، اما اگر خطا داد نباید کل برنامه متوقف شود
+        await authStore.initializeAuth().catch(err => console.error('Auth Init Error:', err))
+      }
+   
+      if (to.meta.requiresAuth && !authStore.user) {
+        next({ name: 'login' })
+      } else if (to.meta.requiresAdmin && !authStore.isAdmin) {
+        next({ name: 'home' }) 
+      } else {
+        next()
+      }
+    } catch (error) {
+      console.error('Router Guard Error:', error)
+      next() // در صورت بروز خطا، اجازه ورود بده تا صفحه سفید نشود
     }
   })
 }

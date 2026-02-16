@@ -14,35 +14,49 @@ export const useAuthStore = defineStore('auth', () => {
 
   // بررسی وضعیت لاگین در شروع برنامه
   const initializeAuth = async () => {
-    const { data } = await supabase.auth.getSession()
-    session.value = data.session
-    user.value = data.session?.user
-    
-    if (user.value) {
-      await fetchProfile()
-    }
-    
-    supabase.auth.onAuthStateChange(async (_event, _session) => {
-      session.value = _session
-      user.value = _session?.user
+    try {
+      const { data, error } = await supabase.auth.getSession()
+      
+      if (error) {
+        console.warn('Auth session error (safe to ignore if guest):', error.message)
+        return
+      }
+
+      session.value = data.session
+      user.value = data.session?.user
+      
       if (user.value) {
         await fetchProfile()
-      } else {
-        profile.value = null
       }
-    })
+      
+      supabase.auth.onAuthStateChange(async (_event, _session) => {
+        session.value = _session
+        user.value = _session?.user
+        if (user.value) {
+          await fetchProfile()
+        } else {
+          profile.value = null
+        }
+      })
+    } catch (e) {
+      console.error('Failed to initialize auth:', e)
+    }
   }
 
   const fetchProfile = async () => {
     if (!user.value) return
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.value.id)
-      .single()
-    
-    if (!error && data) {
-      profile.value = data
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.value.id)
+        .single()
+      
+      if (!error && data) {
+        profile.value = data
+      }
+    } catch (e) {
+      console.error('Error fetching profile:', e)
     }
   }
 
