@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { ShoppingCart, Heart, Eye } from 'lucide-vue-next'
 import { useCartStore } from '@/stores/cart'
+import { useSettingsStore } from '@/stores/settings'
 import { useRouter } from 'vue-router'
+import { onMounted } from 'vue'
 
 const props = defineProps<{
   product: {
@@ -12,11 +14,20 @@ const props = defineProps<{
     category: string
     isNew?: boolean
     discount?: number
+    slug?: string
   }
 }>()
 
 const cartStore = useCartStore()
+const settingsStore = useSettingsStore()
 const router = useRouter()
+
+onMounted(() => {
+  // اطمینان از لود شدن تنظیمات
+  if (!settingsStore.settings.product_url_type) {
+    settingsStore.fetchSettings()
+  }
+})
 
 const addToCart = (e: Event) => {
   e.stopPropagation()
@@ -25,7 +36,9 @@ const addToCart = (e: Event) => {
 }
 
 const goToDetail = () => {
-  router.push({ name: 'product-detail', params: { id: props.product.id } })
+  const urlType = settingsStore.settings.product_url_type || 'id'
+  const param = (urlType === 'slug' && props.product.slug) ? props.product.slug : props.product.id
+  router.push({ name: 'product-detail', params: { id: param } })
 }
 </script>
 

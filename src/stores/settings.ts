@@ -18,7 +18,8 @@ export const useSettingsStore = defineStore('settings', () => {
     card_number: '',
     card_owner: '',
     card_shaba: '',
-    bank_name: ''
+    bank_name: '',
+    product_url_type: 'id' // 'id' or 'slug'
   })
   
   const shippingMethods = ref<ShippingMethod[]>([])

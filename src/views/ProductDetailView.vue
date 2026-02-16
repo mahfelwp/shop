@@ -15,20 +15,29 @@ const loading = ref(true)
 const selectedImage = ref('')
 
 onMounted(async () => {
-  const id = route.params.id
-  if (!id) return
+  const param = route.params.id as string
+  if (!param) return
 
   loading.value = true
-  const { data, error } = await supabase
-    .from('products')
-    .select('*')
-    .eq('id', id)
-    .single()
+  
+  let query = supabase.from('products').select('*')
+  
+  // تشخیص اینکه پارامتر ID است یا Slug
+  // اگر تماماً عدد باشد، فرض می‌کنیم ID است
+  if (/^\d+$/.test(param)) {
+    query = query.eq('id', param)
+  } else {
+    query = query.eq('slug', param)
+  }
+
+  const { data, error } = await query.single()
 
   if (data) {
     product.value = data
     selectedImage.value = data.image
   } else {
+    // اگر با Slug پیدا نشد، شاید کاربر ID وارد کرده ولی به صورت رشته
+    // یا محصول وجود ندارد
     router.push('/products')
   }
   loading.value = false

@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { useToastStore } from '@/stores/toast'
 import { useCategoryStore } from '@/stores/category'
 import { useCurrencyStore } from '@/stores/currency'
-import { Upload, X, Loader2, Image as ImageIcon, Video, ArrowRight, Plus, Check, AlertCircle, Calculator } from 'lucide-vue-next'
+import { Upload, X, Loader2, Image as ImageIcon, Video, ArrowRight, Plus, Check, AlertCircle, Calculator, Link } from 'lucide-vue-next'
 
 const route = useRoute()
 const router = useRouter()
@@ -20,6 +20,7 @@ const submitting = ref(false)
 // Form Data
 const form = ref({
   title: '',
+  slug: '', // New Field
   price: '', // قیمت نهایی به تومان
   category: '',
   description: '',
@@ -71,6 +72,16 @@ watch([() => form.value.pricing_method, () => form.value.base_price], () => {
   }
 })
 
+const generateSlug = () => {
+  if (!form.value.title) return
+  // تبدیل عنوان به اسلاگ: جایگزینی فاصله با خط تیره، حذف کاراکترهای خاص
+  form.value.slug = form.value.title
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-zA-Z0-9\u0600-\u06FF-]/g, '') // حفظ حروف فارسی و انگلیسی و اعداد
+    .toLowerCase()
+}
+
 const fetchProduct = async (id: number) => {
   loading.value = true
   const { data, error } = await supabase.from('products').select('*').eq('id', id).single()
@@ -83,7 +94,8 @@ const fetchProduct = async (id: number) => {
       min_order: data.min_order || 1,
       max_order: data.max_order || null,
       pricing_method: data.pricing_method || 'fixed',
-      base_price: data.base_price || 0
+      base_price: data.base_price || 0,
+      slug: data.slug || ''
     }
     mainImagePreview.value = data.image
     galleryPreviews.value = data.gallery || []
@@ -212,6 +224,7 @@ const saveProduct = async () => {
 
     const productData = {
       title: form.value.title,
+      slug: form.value.slug || null, // Save slug
       price: parseInt(form.value.price),
       category: form.value.category,
       description: form.value.description,
@@ -239,7 +252,11 @@ const saveProduct = async () => {
 
   } catch (e: any) {
     console.error(e)
-    toastStore.showToast('خطا: ' + e.message, 'error')
+    if (e.code === '23505') { // Unique violation
+      toastStore.showToast('این نامک (Slug) قبلاً استفاده شده است. لطفاً تغییر دهید.', 'error')
+    } else {
+      toastStore.showToast('خطا: ' + e.message, 'error')
+    }
   } finally {
     submitting.value = false
   }
@@ -281,7 +298,21 @@ const saveProduct = async () => {
           <div class="space-y-4">
             <div>
               <label class="block text-sm font-bold text-stone-700 mb-2">نام محصول <span class="text-red-500">*</span></label>
-              <input v-model="form.title" type="text" class="w-full px-4 py-3 rounded-xl border border-stone-200 focus:border-stone-900 outline-none transition" placeholder="مثلا: سبد حصیری مدل آوا" />
+              <input v-model="form.title" type="text" class="w-full px-4 py-3 rounded-xl border border-stone-200 focus:border-stone-900 outline-none transition" placeholder="مثلا: سبد حصیری مدل آوا" @input="!isEditing && !form.slug ? generateSlug() : null" />
+            </div>
+
+            <!-- Slug Field -->
+            <div>
+              <label class="block text-sm font-bold text-stone-700 mb-2 flex items-center justify-between">
+                <span>نامک (Slug) - برای آدرس‌دهی سئو</span>
+                <button @click="generateSlug" class="text-xs text-indigo-600 hover:underline flex items-center gap-1">
+                  <Link class="w-3 h-3" /> تولید خودکار
+                </button>
+              </label>
+              <div class="relative">
+                <input v-model="form.slug" type="text" class="w-full px-4 py-3 rounded-xl border border-stone-200 focus:border-stone-900 outline-none transition dir-ltr text-left font-mono text-sm" placeholder="my-product-slug" />
+              </div>
+              <p class="text-xs text-stone-400 mt-1 dir-ltr text-left">example.com/products/{{ form.slug || '...' }}</p>
             </div>
             
             <!-- Pricing Section -->
