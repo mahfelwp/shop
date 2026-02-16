@@ -2,6 +2,7 @@ import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
 import LoginView from '../views/LoginView.vue'
 import ProductListView from '../views/ProductListView.vue'
+import ProductDetailView from '../views/ProductDetailView.vue'
 import CartView from '../views/CartView.vue'
 import CheckoutView from '../views/CheckoutView.vue'
 import PaymentResultView from '../views/PaymentResultView.vue'
@@ -22,10 +23,12 @@ import AdminAnalytics from '../components/admin/AdminAnalytics.vue'
 import AdminSettings from '../views/admin/AdminSettings.vue'
 import AdminSetup from '../views/admin/AdminSetup.vue'
 import AdminCouponManager from '../components/admin/AdminCouponManager.vue'
+import AdminCommentManager from '../components/admin/AdminCommentManager.vue'
  
 export const routes: RouteRecordRaw[] = [
   { path: '/', name: 'home', component: HomeView },
   { path: '/products', name: 'products', component: ProductListView },
+  { path: '/products/:id', name: 'product-detail', component: ProductDetailView },
   { path: '/login', name: 'login', component: LoginView },
   { path: '/cart', name: 'cart', component: CartView },
   { path: '/checkout', name: 'checkout', component: CheckoutView, meta: { requiresAuth: true } },
@@ -49,6 +52,7 @@ export const routes: RouteRecordRaw[] = [
       { path: 'users', name: 'admin-users', component: AdminCustomerList, meta: { title: 'لیست مشتریان' } },
       { path: 'analytics', name: 'admin-analytics', component: AdminAnalytics, meta: { title: 'آمار و گزارشات' } },
       { path: 'coupons', name: 'admin-coupons', component: AdminCouponManager, meta: { title: 'مدیریت کدهای تخفیف' } },
+      { path: 'comments', name: 'admin-comments', component: AdminCommentManager, meta: { title: 'مدیریت نظرات' } },
       { path: 'settings', name: 'admin-settings', component: AdminSettings, meta: { title: 'تنظیمات سیستم' } }
     ]
   },

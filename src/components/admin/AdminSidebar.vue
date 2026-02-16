@@ -12,7 +12,8 @@ import {
   ChevronRight,
   Layers,
   Globe,
-  BadgePercent
+  BadgePercent,
+  MessageSquare
 } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 import { useRoute } from 'vue-router'
@@ -40,7 +41,8 @@ const menuGroups = [
       { routeName: 'admin-categories', label: 'دسته‌بندی‌ها', icon: Layers },
       { routeName: 'admin-orders', label: 'سفارشات', icon: ShoppingCart },
       { routeName: 'admin-inventory', label: 'مدیریت موجودی', icon: Package },
-      { routeName: 'admin-coupons', label: 'کدهای تخفیف', icon: BadgePercent}
+      { routeName: 'admin-coupons', label: 'کدهای تخفیف', icon: BadgePercent},
+      { routeName: 'admin-comments', label: 'نظرات کاربران', icon: MessageSquare}
     ]
   },
   {

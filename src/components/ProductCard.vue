@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ShoppingCart, Heart, Eye } from 'lucide-vue-next'
 import { useCartStore } from '@/stores/cart'
+import { useRouter } from 'vue-router'
 
 const props = defineProps<{
   product: {
@@ -15,14 +16,21 @@ const props = defineProps<{
 }>()
 
 const cartStore = useCartStore()
+const router = useRouter()
 
-const addToCart = () => {
+const addToCart = (e: Event) => {
+  e.stopPropagation()
+  e.preventDefault()
   cartStore.addItem(props.product)
+}
+
+const goToDetail = () => {
+  router.push({ name: 'product-detail', params: { id: props.product.id } })
 }
 </script>
 
 <template>
-  <div class="group relative">
+  <div class="group relative cursor-pointer" @click="goToDetail">
     <!-- Image Container -->
     <div class="relative aspect-[3/4] overflow-hidden rounded-[32px] bg-stone-100 mb-5 shadow-sm group-hover:shadow-xl transition-all duration-500">
       <img :src="props.product.image" :alt="props.product.title" class="w-full h-full object-cover transition duration-700 group-hover:scale-110" />
