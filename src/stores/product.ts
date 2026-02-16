@@ -15,6 +15,7 @@ export interface Product {
   min_order?: number
   max_order?: number
   created_at?: string
+  slug?: string
 }
 
 export const useProductStore = defineStore('product', () => {
@@ -22,7 +23,6 @@ export const useProductStore = defineStore('product', () => {
   const loading = ref(false)
   const error = ref<string | null>(null)
 
-  // دریافت همه محصولات از سوپابیس
   const fetchProducts = async () => {
     loading.value = true
     error.value = null
@@ -36,20 +36,29 @@ export const useProductStore = defineStore('product', () => {
       products.value = data as Product[]
     } catch (e: any) {
       console.error('Error fetching products:', e)
-      error.value = 'خطا در دریافت محصولات'
+      // اگر خطا AbortError بود، یعنی درخواست کنسل شده، نیازی به نمایش خطا به کاربر نیست
+      if (e.message && e.message.includes('AbortError')) {
+        console.debug('Product fetch aborted')
+      } else {
+        error.value = 'خطا در دریافت محصولات'
+      }
     } finally {
       loading.value = false
     }
   }
 
-  // دریافت محصولات ویژه برای صفحه اصلی
   const fetchFeaturedProducts = async () => {
-    const { data } = await supabase
-      .from('products')
-      .select('*')
-      .eq('is_featured', true)
-      .limit(4)
-    return data as Product[] || []
+    try {
+      const { data } = await supabase
+        .from('products')
+        .select('*')
+        .eq('is_featured', true)
+        .limit(4)
+      return data as Product[] || []
+    } catch (e) {
+      console.error('Error fetching featured:', e)
+      return []
+    }
   }
 
   return { products, loading, error, fetchProducts, fetchFeaturedProducts }

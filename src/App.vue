@@ -4,10 +4,19 @@ import ToastNotification from '@/components/ToastNotification.vue'
 import { Instagram, Send, Phone, Mail, MapPin, Heart } from 'lucide-vue-next'
 import { useRoute } from 'vue-router'
 import { useHead } from '@vueuse/head'
+import { onMounted } from 'vue'
+import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
+const authStore = useAuthStore()
 
-// تنظیمات سئو کلی و الگوی عنوان
+// شروع احراز هویت در پس‌زمینه به محض لود شدن برنامه
+onMounted(() => {
+  if (!authStore.isInitialized) {
+    authStore.initializeAuth()
+  }
+})
+
 useHead({
   titleTemplate: (title) => title ? `${title} | فروشگاه حصیرباف` : 'فروشگاه صنایع دستی حصیرباف',
   meta: [
@@ -19,7 +28,6 @@ useHead({
 
 <template>
   <div class="min-h-screen flex flex-col font-sans">
-    <!-- نمایش هدر فقط اگر در صفحه ادمین نباشیم -->
     <AppHeader v-if="!route.meta.hideLayout" />
     
     <ToastNotification />
@@ -28,12 +36,10 @@ useHead({
       <router-view />
     </main>
 
-    <!-- نمایش فوتر فقط اگر در صفحه ادمین نباشیم -->
     <footer v-if="!route.meta.hideLayout" class="bg-stone-900 text-stone-300 pt-16 pb-8 mt-auto border-t border-stone-800">
       <div class="container mx-auto px-4 md:px-8">
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-12">
           
-          <!-- ستون اول: درباره ما -->
           <div class="space-y-6">
             <div class="flex items-center gap-2">
               <div class="w-8 h-8 bg-white text-stone-900 rounded-full flex items-center justify-center text-lg font-serif font-bold">H</div>
@@ -55,7 +61,6 @@ useHead({
             </div>
           </div>
 
-          <!-- ستون دوم: دسترسی سریع -->
           <div>
             <h3 class="text-white font-bold text-lg mb-6 relative inline-block after:content-[''] after:absolute after:-bottom-2 after:right-0 after:w-8 after:h-1 after:bg-accent after:rounded-full">دسترسی سریع</h3>
             <ul class="space-y-3 text-sm">
@@ -66,7 +71,6 @@ useHead({
             </ul>
           </div>
 
-          <!-- ستون سوم: خدمات مشتریان -->
           <div>
             <h3 class="text-white font-bold text-lg mb-6 relative inline-block after:content-[''] after:absolute after:-bottom-2 after:right-0 after:w-8 after:h-1 after:bg-accent after:rounded-full">خدمات مشتریان</h3>
             <ul class="space-y-3 text-sm">
@@ -77,7 +81,6 @@ useHead({
             </ul>
           </div>
 
-          <!-- ستون چهارم: تماس و نماد -->
           <div>
             <h3 class="text-white font-bold text-lg mb-6 relative inline-block after:content-[''] after:absolute after:-bottom-2 after:right-0 after:w-8 after:h-1 after:bg-accent after:rounded-full">اطلاعات تماس</h3>
             <ul class="space-y-4 text-sm mb-6">
@@ -103,7 +106,6 @@ useHead({
           </div>
         </div>
 
-        <!-- کپی رایت -->
         <div class="border-t border-stone-800 pt-8 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-stone-500">
           <p>تمامی حقوق مادی و معنوی این وبسایت متعلق به فروشگاه حصیرباف می‌باشد.</p>
           <div class="flex items-center gap-1">

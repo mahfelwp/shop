@@ -81,15 +81,11 @@ const router = createRouter({
   }
 })
 
-// --- FIX: مدیریت خطاهای ناگهانی روتر ---
 router.onError((error) => {
   const targetPath = router.currentRoute.value.fullPath
   console.error('Router Error:', error)
-  
-  // 1. اگر خطا مربوط به لود نشدن فایل‌های JS/CSS باشد (ورژن جدید دیپلوی شده)
   if (error.message.includes('Failed to fetch') || error.message.includes('Importing a module script failed')) {
     if (!targetPath) return
-    // صفحه را ریلود کن تا فایل‌های جدید را بگیرد
     window.location.reload()
   }
 })
@@ -99,9 +95,13 @@ export const setupGuards = (routerInstance: any) => {
     const authStore = useAuthStore()
     
     try {
-      if (!authStore.session) {
-        // تلاش برای احراز هویت، اما اگر خطا داد نباید کل برنامه متوقف شود
-        await authStore.initializeAuth().catch(err => console.error('Auth Init Error:', err))
+      // استراتژی جدید: فقط اگر روت نیاز به احراز هویت دارد، منتظر بمان
+      // برای روت‌های عمومی، احراز هویت در پس‌زمینه انجام می‌شود (توسط App.vue)
+      if (to.meta.requiresAuth && !authStore.isInitialized) {
+        await authStore.initializeAuth()
+      } else if (!authStore.isInitialized) {
+        // برای روت‌های عمومی، پروسه را شروع کن اما منتظر نمان (Fire and Forget)
+        authStore.initializeAuth().catch(err => console.debug('Background auth check failed', err))
       }
    
       if (to.meta.requiresAuth && !authStore.user) {
@@ -113,7 +113,7 @@ export const setupGuards = (routerInstance: any) => {
       }
     } catch (error) {
       console.error('Router Guard Error:', error)
-      next() // در صورت بروز خطا، اجازه ورود بده تا صفحه سفید نشود
+      next() // اجازه ورود اضطراری برای جلوگیری از صفحه سفید
     }
   })
 }
