@@ -1,83 +1,124 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { supabase } from '@/lib/supabase'
 import { useCartStore } from '@/stores/cart'
 import { useSettingsStore } from '@/stores/settings'
-import { ShoppingCart, ArrowRight, Star, Truck, ShieldCheck, Heart } from 'lucide-vue-next'
+import { ShoppingCart, ArrowRight, Truck, ShieldCheck, Heart } from 'lucide-vue-next'
 import ProductComments from '@/components/product/ProductComments.vue'
+
+type Product = {
+  id: number
+  slug: string | null
+  title: string
+  description: string | null
+  category: string | null
+  is_featured: boolean | null
+  price: number
+  image: string | null
+  gallery: string[] | null
+}
 
 const route = useRoute()
 const router = useRouter()
 const cartStore = useCartStore()
 const settingsStore = useSettingsStore()
 
-const product = ref<any>(null)
-const loading = ref(true)
+const product = ref<Product | null>(null)
+const loading = ref(false)
 const selectedImage = ref('')
 
-onMounted(async () => {
-  const param = route.params.id as string
-  if (!param) return
-
-  loading.value = true
-  
-  // اطمینان از لود شدن تنظیمات برای تصمیم‌گیری در مورد URL
-  if (!settingsStore.isLoaded) {
-    await settingsStore.fetchSettings()
-  }
-
-  let query = supabase.from('products').select('*')
-  
-  // تشخیص اینکه پارامتر ID است یا Slug برای پیدا کردن محصول در دیتابیس
-  const isParamId = /^\d+$/.test(param)
-  
-  if (isParamId) {
-    query = query.eq('id', param)
-  } else {
-    query = query.eq('slug', param)
-  }
-
-  const { data, error } = await query.single()
-
-  if (data) {
-    product.value = data
-    selectedImage.value = data.image
-
-    // --- لاجیک اجبار نوع URL (Redirect) ---
-    const urlType = settingsStore.settings.product_url_type || 'id'
-    
-    // حالت ۱: تنظیمات روی ID است، اما کاربر با Slug وارد شده است
-    if (urlType === 'id' && !isParamId) {
-      router.replace({ name: 'product-detail', params: { id: data.id } })
-      return
-    }
-
-    // حالت ۲: تنظیمات روی Slug است، اما کاربر با ID وارد شده است (و محصول اسلاگ دارد)
-    if (urlType === 'slug' && isParamId && data.slug) {
-      router.replace({ name: 'product-detail', params: { id: data.slug } })
-      return
-    }
-    // --------------------------------------
-
-  } else {
-    router.push('/products')
-  }
-  loading.value = false
+const rawParam = computed(() => {
+  const p = route.params.id
+  return Array.isArray(p) ? (p[0] ?? '') : String(p ?? '')
 })
 
-const addToCart = () => {
-  if (product.value) {
-    cartStore.addItem(product.value)
+const isNumericId = (value: string) => /^\d+$/.test(value)
+
+const galleryImages = computed(() => {
+  const g = product.value?.gallery
+  return Array.isArray(g) ? g : []
+})
+
+const formattedPrice = computed(() => {
+  const price = product.value?.price
+  return typeof price === 'number' ? price.toLocaleString() : ''
+})
+
+async function ensureSettingsLoaded() {
+  if (!settingsStore.isLoaded) await settingsStore.fetchSettings()
+}
+
+function canonicalParamFor(product: Product): string {
+  const urlType = settingsStore.settings?.product_url_type || 'id'
+  if (urlType === 'slug' && product.slug) return product.slug
+  return String(product.id)
+}
+
+async function fetchProduct(param: string): Promise<Product | null> {
+  let query = supabase.from('products').select('*')
+
+  if (isNumericId(param)) query = query.eq('id', Number(param))
+  else query = query.eq('slug', param)
+
+  const { data, error } = await query.single<Product>()
+  if (error) return null
+  return data ?? null
+}
+
+async function load() {
+  const param = rawParam.value.trim()
+  if (!param) {
+    product.value = null
+    selectedImage.value = ''
+    return
   }
+
+  loading.value = true
+  try {
+    await ensureSettingsLoaded()
+
+    const data = await fetchProduct(param)
+    if (!data) {
+      product.value = null
+      selectedImage.value = ''
+      await router.replace({ name: 'products' })
+      return
+    }
+
+    // Canonical redirect (اجبار نوع URL بر اساس تنظیمات)
+    const canonical = canonicalParamFor(data)
+    if (canonical !== param) {
+      await router.replace({
+        name: 'product-detail',
+        params: { id: canonical },
+        query: route.query,
+        hash: route.hash,
+      })
+      return
+    }
+
+    product.value = data
+    selectedImage.value = data.image || data.gallery?.[0] || ''
+  } finally {
+    loading.value = false
+  }
+}
+
+watch(rawParam, () => void load(), { immediate: true })
+
+function addToCart() {
+  if (product.value) cartStore.addItem(product.value)
 }
 </script>
 
 <template>
   <div class="bg-stone-50 min-h-screen pt-32 pb-12">
     <div class="container mx-auto px-4 md:px-8">
-      
-      <button @click="router.back()" class="flex items-center gap-2 text-stone-500 hover:text-stone-900 mb-8 transition font-bold text-sm">
+      <button
+        @click="router.back()"
+        class="flex items-center gap-2 text-stone-500 hover:text-stone-900 mb-8 transition font-bold text-sm"
+      >
         <ArrowRight class="w-4 h-4" /> بازگشت
       </button>
 
@@ -87,28 +128,35 @@ const addToCart = () => {
 
       <div v-else-if="product" class="animate-fade-in">
         <div class="bg-white rounded-3xl p-6 md:p-8 shadow-sm border border-stone-100 grid lg:grid-cols-2 gap-12">
-          
           <!-- Gallery -->
           <div class="space-y-4">
             <div class="aspect-square rounded-2xl overflow-hidden bg-stone-100 border border-stone-200">
-              <img :src="selectedImage" class="w-full h-full object-cover" />
+              <img
+                v-if="selectedImage"
+                :src="selectedImage"
+                :alt="product.title"
+                class="w-full h-full object-cover"
+              />
             </div>
+
             <div class="flex gap-4 overflow-x-auto pb-2">
-              <button 
+              <button
+                v-if="product.image"
                 @click="selectedImage = product.image"
                 class="w-20 h-20 rounded-xl overflow-hidden border-2 transition flex-shrink-0"
                 :class="selectedImage === product.image ? 'border-stone-900' : 'border-transparent hover:border-stone-300'"
               >
-                <img :src="product.image" class="w-full h-full object-cover" />
+                <img :src="product.image" :alt="product.title" class="w-full h-full object-cover" />
               </button>
-              <button 
-                v-for="(img, idx) in product.gallery" 
+
+              <button
+                v-for="(img, idx) in galleryImages"
                 :key="idx"
                 @click="selectedImage = img"
                 class="w-20 h-20 rounded-xl overflow-hidden border-2 transition flex-shrink-0"
                 :class="selectedImage === img ? 'border-stone-900' : 'border-transparent hover:border-stone-300'"
               >
-                <img :src="img" class="w-full h-full object-cover" />
+                <img :src="img" :alt="product.title" class="w-full h-full object-cover" />
               </button>
             </div>
           </div>
@@ -116,15 +164,18 @@ const addToCart = () => {
           <!-- Info -->
           <div>
             <div class="flex items-center gap-2 mb-4">
-              <span class="bg-stone-100 text-stone-600 px-3 py-1 rounded-full text-xs font-bold">{{ product.category }}</span>
+              <span class="bg-stone-100 text-stone-600 px-3 py-1 rounded-full text-xs font-bold">
+                {{ product.category }}
+              </span>
               <span v-if="product.is_featured" class="bg-accent text-white px-3 py-1 rounded-full text-xs font-bold">ویژه</span>
             </div>
 
             <h1 class="text-3xl md:text-4xl font-black text-stone-900 mb-4">{{ product.title }}</h1>
-            
+
             <div class="flex items-center gap-4 mb-8">
               <div class="text-3xl font-black text-stone-900">
-                {{ product.price.toLocaleString() }} <span class="text-sm font-normal text-stone-500">تومان</span>
+                {{ formattedPrice }}
+                <span class="text-sm font-normal text-stone-500">تومان</span>
               </div>
             </div>
 
@@ -133,7 +184,7 @@ const addToCart = () => {
             </p>
 
             <div class="flex gap-4 mb-8">
-              <button 
+              <button
                 @click="addToCart"
                 class="flex-1 bg-stone-900 text-white py-4 rounded-xl font-bold text-lg hover:bg-accent transition flex items-center justify-center gap-2 shadow-lg shadow-stone-900/20"
               >
@@ -157,7 +208,6 @@ const addToCart = () => {
           </div>
         </div>
 
-        <!-- Comments Section -->
         <ProductComments :productId="product.id" />
       </div>
     </div>
