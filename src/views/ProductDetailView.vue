@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { supabase } from '@/lib/supabase'
 import { useCartStore } from '@/stores/cart'
 import { useSettingsStore } from '@/stores/settings'
-import { ShoppingCart, ArrowRight, Truck, ShieldCheck, Heart } from 'lucide-vue-next'
+import { ShoppingCart, ArrowRight, Truck, ShieldCheck, Heart, Video } from 'lucide-vue-next'
 import ProductComments from '@/components/product/ProductComments.vue'
 
 type Product = {
@@ -17,6 +17,7 @@ type Product = {
   price: number
   image: string | null
   gallery: string[] | null
+  video: string | null
 }
 
 const route = useRoute()
@@ -205,6 +206,20 @@ function addToCart() {
                 <span>ضمانت اصالت و سلامت کالا</span>
               </div>
             </div>
+          </div>
+        </div>
+
+        <!-- Video Section -->
+        <div v-if="product.video" class="mt-12 bg-white rounded-3xl p-6 md:p-8 shadow-sm border border-stone-100">
+          <h3 class="text-2xl font-bold text-stone-800 mb-6 flex items-center gap-2">
+            <Video class="w-6 h-6 text-accent" />
+            ویدیو معرفی محصول
+          </h3>
+          <div class="rounded-2xl overflow-hidden bg-black aspect-video relative shadow-lg">
+            <video controls class="w-full h-full" :poster="product.image || ''">
+              <source :src="product.video" type="video/mp4">
+              مرورگر شما از پخش ویدیو پشتیبانی نمی‌کند.
+            </video>
           </div>
         </div>
 
