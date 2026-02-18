@@ -1,75 +1,86 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useProductStore } from '@/stores/product'
 import { SlidersHorizontal, Filter, Loader2, Search } from 'lucide-vue-next'
 import ProductCard from '@/components/ProductCard.vue'
 import ProductFilterSidebar from '@/components/product/ProductFilterSidebar.vue'
 import { useHead } from '@vueuse/head'
 
+type SortOption = 'newest' | 'cheapest' | 'expensive'
+
 const productStore = useProductStore()
 
-// استیت‌های فیلترینگ
+// Filters
 const searchQuery = ref('')
 const selectedCategory = ref('all')
-const maxPrice = ref(5000000)
-const sortOption = ref('newest')
+const maxPrice = ref(5_000_000)
+const sortOption = ref<SortOption>('newest')
 const showMobileFilters = ref(false)
 
-// سئو داینامیک بر اساس دسته‌بندی
-useHead({
-  title: computed(() => {
-    if (selectedCategory.value !== 'all') {
-      return `خرید ${selectedCategory.value}`
-    }
-    return 'فروشگاه محصولات'
-  }),
-  meta: [
-    { 
-      name: 'description', 
-      content: computed(() => `لیست کامل محصولات حصیری${selectedCategory.value !== 'all' ? ' دسته‌بندی ' + selectedCategory.value : ''}. خرید آنلاین با بهترین قیمت و کیفیت تضمینی.`) 
-    }
-  ]
-})
-
-onMounted(() => {
-  productStore.fetchProducts()
-})
+const normalizedSearch = computed(() => searchQuery.value.trim().toLowerCase())
 
 const categories = computed(() => {
-  const cats = new Set(productStore.products.map(p => p.category))
-  return ['all', ...cats]
+  const cats = new Set<string>()
+  for (const p of productStore.products) {
+    if (p.category) cats.add(p.category)
+  }
+  return ['all', ...Array.from(cats)]
 })
 
 const filteredProducts = computed(() => {
-  let result = productStore.products.filter(product => {
-    const matchSearch = product.title.toLowerCase().includes(searchQuery.value.toLowerCase())
-    const matchCategory = selectedCategory.value === 'all' || product.category === selectedCategory.value
-    const matchPrice = product.price <= maxPrice.value
+  const q = normalizedSearch.value
+  const cat = selectedCategory.value
+  const cap = maxPrice.value
+
+  const result = productStore.products.filter((p) => {
+    const title = (p.title ?? '').toLowerCase()
+    const matchSearch = !q || title.includes(q)
+    const matchCategory = cat === 'all' || p.category === cat
+    const matchPrice = (p.price ?? 0) <= cap
     return matchSearch && matchCategory && matchPrice
   })
 
-  if (sortOption.value === 'cheapest') {
-    result.sort((a, b) => a.price - b.price)
-  } else if (sortOption.value === 'expensive') {
-    result.sort((a, b) => b.price - a.price)
-  } else {
-    result.sort((a, b) => b.id - a.id)
-  }
-
-  return result
+  // avoid mutating original array ordering (sort on copy)
+  return result.slice().sort((a, b) => {
+    if (sortOption.value === 'cheapest') return (a.price ?? 0) - (b.price ?? 0)
+    if (sortOption.value === 'expensive') return (b.price ?? 0) - (a.price ?? 0)
+    return (b.id ?? 0) - (a.id ?? 0)
+  })
 })
 
-const resetFilters = () => {
+const activeCategoryLabel = computed(() =>
+  selectedCategory.value !== 'all' ? selectedCategory.value : null,
+)
+
+useHead({
+  title: computed(() => (activeCategoryLabel.value ? `خرید ${activeCategoryLabel.value}` : 'فروشگاه محصولات')),
+  meta: [
+    {
+      name: 'description',
+      content: computed(() => {
+        const suffix = activeCategoryLabel.value ? ` دسته‌بندی ${activeCategoryLabel.value}` : ''
+        return `لیست کامل محصولات حصیری${suffix}. خرید آنلاین با بهترین قیمت و کیفیت تضمینی.`
+      }),
+    },
+  ],
+})
+
+onMounted(() => {
+  // اگر قبلاً لود شده، بی‌خودی دوباره نزن
+  if (!productStore.products.length) productStore.fetchProducts()
+})
+
+function resetFilters() {
   selectedCategory.value = 'all'
   searchQuery.value = ''
-  maxPrice.value = 5000000
+  maxPrice.value = 5_000_000
+  sortOption.value = 'newest'
 }
 </script>
 
 <template>
   <div class="bg-stone-50 min-h-screen pt-32 pb-12">
     <div class="container mx-auto px-4 md:px-8">
-      
       <!-- Header Section -->
       <div class="flex flex-col md:flex-row items-center justify-between mb-8 gap-4">
         <div class="text-center md:text-right">
@@ -80,7 +91,8 @@ const resetFilters = () => {
           </p>
         </div>
 
-        <button 
+        <button
+          type="button"
           @click="showMobileFilters = !showMobileFilters"
           class="md:hidden w-full flex items-center justify-center gap-2 bg-white border border-stone-200 py-3 rounded-xl font-bold text-stone-700 shadow-sm"
         >
@@ -90,9 +102,8 @@ const resetFilters = () => {
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
-        
         <!-- SIDEBAR FILTERS COMPONENT -->
-        <ProductFilterSidebar 
+        <ProductFilterSidebar
           v-model:showMobile="showMobileFilters"
           v-model:searchQuery="searchQuery"
           v-model:selectedCategory="selectedCategory"
@@ -103,18 +114,38 @@ const resetFilters = () => {
 
         <!-- PRODUCT GRID -->
         <main class="lg:col-span-3">
-          
           <!-- Sort Bar -->
           <div class="bg-white p-4 rounded-2xl shadow-sm border border-stone-100 mb-6 flex flex-wrap items-center justify-between gap-4">
             <div class="flex items-center gap-2 text-stone-500 text-sm">
               <SlidersHorizontal class="w-4 h-4" />
               <span>مرتب‌سازی:</span>
             </div>
-            
+
             <div class="flex gap-2 overflow-x-auto pb-1 md:pb-0 no-scrollbar">
-              <button @click="sortOption = 'newest'" class="px-4 py-2 rounded-lg text-sm font-medium transition whitespace-nowrap" :class="sortOption === 'newest' ? 'bg-stone-900 text-white' : 'bg-stone-50 text-stone-600 hover:bg-stone-100'">جدیدترین</button>
-              <button @click="sortOption = 'cheapest'" class="px-4 py-2 rounded-lg text-sm font-medium transition whitespace-nowrap" :class="sortOption === 'cheapest' ? 'bg-stone-900 text-white' : 'bg-stone-50 text-stone-600 hover:bg-stone-100'">ارزان‌ترین</button>
-              <button @click="sortOption = 'expensive'" class="px-4 py-2 rounded-lg text-sm font-medium transition whitespace-nowrap" :class="sortOption === 'expensive' ? 'bg-stone-900 text-white' : 'bg-stone-50 text-stone-600 hover:bg-stone-100'">گران‌ترین</button>
+              <button
+                type="button"
+                @click="sortOption = 'newest'"
+                class="px-4 py-2 rounded-lg text-sm font-medium transition whitespace-nowrap"
+                :class="sortOption === 'newest' ? 'bg-stone-900 text-white' : 'bg-stone-50 text-stone-600 hover:bg-stone-100'"
+              >
+                جدیدترین
+              </button>
+              <button
+                type="button"
+                @click="sortOption = 'cheapest'"
+                class="px-4 py-2 rounded-lg text-sm font-medium transition whitespace-nowrap"
+                :class="sortOption === 'cheapest' ? 'bg-stone-900 text-white' : 'bg-stone-50 text-stone-600 hover:bg-stone-100'"
+              >
+                ارزان‌ترین
+              </button>
+              <button
+                type="button"
+                @click="sortOption = 'expensive'"
+                class="px-4 py-2 rounded-lg text-sm font-medium transition whitespace-nowrap"
+                :class="sortOption === 'expensive' ? 'bg-stone-900 text-white' : 'bg-stone-50 text-stone-600 hover:bg-stone-100'"
+              >
+                گران‌ترین
+              </button>
             </div>
           </div>
 
@@ -125,11 +156,7 @@ const resetFilters = () => {
 
           <!-- Products List -->
           <div v-else-if="filteredProducts.length > 0" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            <ProductCard 
-              v-for="product in filteredProducts" 
-              :key="product.id" 
-              :product="product" 
-            />
+            <ProductCard v-for="product in filteredProducts" :key="product.id" :product="product" />
           </div>
 
           <!-- Empty State -->
@@ -138,9 +165,10 @@ const resetFilters = () => {
               <Search class="w-8 h-8 text-stone-300" />
             </div>
             <h3 class="text-lg font-bold text-stone-800 mb-2">محصولی یافت نشد</h3>
-            <button @click="resetFilters" class="mt-4 text-accent font-bold text-sm hover:underline">پاک کردن فیلترها</button>
+            <button type="button" @click="resetFilters" class="mt-4 text-accent font-bold text-sm hover:underline">
+              پاک کردن فیلترها
+            </button>
           </div>
-
         </main>
       </div>
     </div>
