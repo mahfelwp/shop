@@ -4,6 +4,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { supabase } from '@/lib/supabase'
 import { useCartStore } from '@/stores/cart'
 import { useSettingsStore } from '@/stores/settings'
+import { useWishlistStore } from '@/stores/wishlist' // اضافه شد
+import { useToastStore } from '@/stores/toast' // اضافه شد
 import {
   ShoppingCart,
   ArrowRight,
@@ -48,6 +50,8 @@ const route = useRoute()
 const router = useRouter()
 const cartStore = useCartStore()
 const settingsStore = useSettingsStore()
+const wishlistStore = useWishlistStore() // اضافه شد
+const toastStore = useToastStore() // اضافه شد
 
 const product = ref<Product | null>(null)
 const relatedProducts = ref<RelatedProduct[]>([])
@@ -257,6 +261,7 @@ function goToRelated(rel: RelatedProduct) {
   router.push({ name: 'product-detail', params: { id: routeParamFor(rel) } })
 }
 
+// عملکرد اشتراک‌گذاری اصلاح شده
 async function shareProduct() {
   const p = product.value
   if (!p) return
@@ -275,9 +280,16 @@ async function shareProduct() {
 
   try {
     await navigator.clipboard.writeText(url)
-    alert('لینک محصول کپی شد.')
+    toastStore.showToast('لینک محصول کپی شد', 'success')
   } catch {
     prompt('لینک را کپی کنید:', url)
+  }
+}
+
+// عملکرد علاقه‌مندی
+function toggleWishlist() {
+  if (product.value) {
+    wishlistStore.toggleWishlist(product.value.id)
   }
 }
 
@@ -410,7 +422,8 @@ useHead({
                 <span v-if="!inStock" class="text-red-500 text-xs font-bold bg-red-50 px-2 py-0.5 rounded">ناموجود</span>
               </div>
 
-              <h1 class="text-3xl md:text-4xl font-serif font-bold text-stone-900 leading-tight mb-6">{{ product.title }}</h1>
+              <!-- اصلاح فونت: حذف font-serif -->
+              <h1 class="text-3xl md:text-4xl font-black text-stone-900 leading-tight mb-6">{{ product.title }}</h1>
 
               <div class="flex items-baseline gap-2 mb-8 border-b border-stone-100 pb-8">
                 <span class="text-3xl font-medium text-stone-900">{{ formattedPrice }}</span>
@@ -446,9 +459,17 @@ useHead({
                 <!-- Secondary Actions & Consultation -->
                 <div class="flex flex-wrap items-center justify-between gap-4 pt-4">
                    <div class="flex gap-4">
-                      <button class="text-stone-500 hover:text-stone-900 text-xs font-medium flex items-center gap-1.5 transition">
-                        <Heart class="w-4 h-4" /> علاقه‌مندی
+                      <!-- دکمه علاقه‌مندی فعال شده -->
+                      <button 
+                        @click="toggleWishlist" 
+                        class="text-xs font-medium flex items-center gap-1.5 transition"
+                        :class="wishlistStore.isInWishlist(product.id) ? 'text-red-500 hover:text-red-600' : 'text-stone-500 hover:text-stone-900'"
+                      >
+                        <Heart class="w-4 h-4" :class="wishlistStore.isInWishlist(product.id) ? 'fill-red-500' : ''" /> 
+                        {{ wishlistStore.isInWishlist(product.id) ? 'حذف از علاقه‌مندی' : 'علاقه‌مندی' }}
                       </button>
+                      
+                      <!-- دکمه اشتراک‌گذاری فعال شده -->
                       <button @click="shareProduct" class="text-stone-500 hover:text-stone-900 text-xs font-medium flex items-center gap-1.5 transition">
                         <Share2 class="w-4 h-4" /> اشتراک‌گذاری
                       </button>

@@ -2,6 +2,7 @@
 import { ShoppingCart, Heart, Eye } from 'lucide-vue-next'
 import { useCartStore } from '@/stores/cart'
 import { useSettingsStore } from '@/stores/settings'
+import { useWishlistStore } from '@/stores/wishlist' // اضافه شد
 import { useRouter } from 'vue-router'
 
 const props = defineProps<{
@@ -21,12 +22,19 @@ const props = defineProps<{
 
 const cartStore = useCartStore()
 const settingsStore = useSettingsStore()
+const wishlistStore = useWishlistStore() // اضافه شد
 const router = useRouter()
 
 const addToCart = (e: Event) => {
   e.stopPropagation()
   e.preventDefault()
   cartStore.addItem(props.product)
+}
+
+const toggleWishlist = (e: Event) => {
+  e.stopPropagation()
+  e.preventDefault()
+  wishlistStore.toggleWishlist(props.product.id)
 }
 
 const goToDetail = async () => {
@@ -65,8 +73,8 @@ const goToDetail = async () => {
         <button @click="addToCart" class="w-12 h-12 bg-white text-stone-900 rounded-full flex items-center justify-center hover:bg-stone-900 hover:text-white transition-all duration-300 shadow-xl hover:scale-110" title="افزودن به سبد">
           <ShoppingCart class="w-5 h-5" />
         </button>
-        <button class="w-12 h-12 bg-white text-stone-900 rounded-full flex items-center justify-center hover:bg-red-500 hover:text-white transition-all duration-300 shadow-xl hover:scale-110" title="علاقمندی">
-          <Heart class="w-5 h-5" />
+        <button @click="toggleWishlist" class="w-12 h-12 bg-white text-stone-900 rounded-full flex items-center justify-center hover:bg-red-500 hover:text-white transition-all duration-300 shadow-xl hover:scale-110" title="علاقمندی">
+          <Heart class="w-5 h-5" :class="wishlistStore.isInWishlist(props.product.id) ? 'fill-red-500 text-red-500' : ''" />
         </button>
         <button class="w-12 h-12 bg-white text-stone-900 rounded-full flex items-center justify-center hover:bg-accent hover:text-white transition-all duration-300 shadow-xl hover:scale-110" title="مشاهده سریع">
           <Eye class="w-5 h-5" />
