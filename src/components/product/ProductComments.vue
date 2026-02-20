@@ -3,7 +3,7 @@ import { ref, onMounted } from 'vue'
 import { useCommentStore } from '@/stores/comment'
 import { useAuthStore } from '@/stores/auth'
 import { useToastStore } from '@/stores/toast'
-import { Star, User, MessageSquare, Send, Loader2, Quote } from 'lucide-vue-next'
+import { Star, User, Send, Loader2, MessageSquare, Quote } from 'lucide-vue-next'
  
 const props = defineProps<{
   productId: number
@@ -46,144 +46,109 @@ const formatDate = (date: string) => {
 </script>
  
 <template>
-  <div class="bg-white rounded-[2.5rem] p-8 md:p-12 border border-stone-100 shadow-sm mt-12">
-    <div class="flex items-center justify-between mb-10">
-      <h3 class="text-2xl font-black text-stone-900 flex items-center gap-3">
-        <div class="w-12 h-12 bg-stone-100 rounded-2xl flex items-center justify-center text-stone-700">
-          <MessageSquare class="w-6 h-6" />
-        </div>
-        نظرات کاربران
-      </h3>
-      <span class="text-sm font-bold text-stone-500 bg-stone-50 px-4 py-2 rounded-full border border-stone-100">
-        {{ commentStore.comments.length }} دیدگاه ثبت شده
-      </span>
-    </div>
- 
-    <div class="grid lg:grid-cols-12 gap-12">
-      
-      <!-- Comment Form (Left Side) -->
-      <div class="lg:col-span-5 order-2 lg:order-1">
-        <div class="bg-stone-900 p-8 rounded-[2rem] text-white relative overflow-hidden shadow-xl">
-          <!-- Decorative Elements -->
-          <div class="absolute top-0 right-0 w-32 h-32 bg-accent rounded-full blur-[80px] opacity-20"></div>
-          <div class="absolute bottom-0 left-0 w-32 h-32 bg-blue-500 rounded-full blur-[80px] opacity-20"></div>
+  <div class="grid lg:grid-cols-12 gap-12">
+    
+    <!-- List Section (Right) -->
+    <div class="lg:col-span-7 order-2 lg:order-1">
+      <div class="flex items-center justify-between mb-8">
+        <h3 class="font-bold text-xl text-stone-800 flex items-center gap-2">
+          <MessageSquare class="w-5 h-5" />
+          نظرات کاربران
+        </h3>
+        <span class="text-xs bg-stone-100 px-3 py-1 rounded-full text-stone-500 font-bold">{{ commentStore.comments.length }} دیدگاه ثبت شده</span>
+      </div>
+
+      <div v-if="commentStore.loading" class="text-center py-12">
+        <Loader2 class="w-8 h-8 animate-spin mx-auto text-stone-300" />
+      </div>
+
+      <div v-else-if="commentStore.comments.length === 0" class="text-center py-12 bg-stone-50 rounded-3xl border border-dashed border-stone-200">
+        <p class="text-stone-500 font-bold text-sm">هنوز نظری برای این محصول ثبت نشده است.</p>
+        <p class="text-stone-400 text-xs mt-1">اولین نفری باشید که نظر می‌دهد!</p>
+      </div>
+
+      <div v-else class="space-y-4">
+        <div v-for="comment in commentStore.comments" :key="comment.id" class="bg-stone-50 p-6 rounded-3xl border border-stone-100 relative group hover:bg-white hover:shadow-sm transition duration-300">
+          <Quote class="absolute top-6 left-6 w-8 h-8 text-stone-200 rotate-180" />
           
-          <div class="relative z-10">
-            <h4 class="font-black text-xl mb-2">دیدگاه خود را بنویسید</h4>
-            <p class="text-stone-400 text-sm mb-8">نظر شما به انتخاب سایر کاربران کمک می‌کند.</p>
-            
-            <div v-if="authStore.isAuthenticated">
-              <div class="mb-6">
-                <label class="block text-xs font-bold text-stone-400 mb-3 uppercase tracking-wider">امتیاز شما</label>
-                <div class="flex gap-2 bg-white/5 p-3 rounded-2xl w-fit backdrop-blur-sm border border-white/10">
-                  <button 
-                    v-for="i in 5" 
-                    :key="i" 
-                    @click="newRating = i"
-                    class="transition hover:scale-110 focus:outline-none"
-                  >
-                    <Star 
-                      class="w-8 h-8 transition-all duration-300" 
-                      :class="i <= newRating ? 'fill-yellow-400 text-yellow-400 drop-shadow-[0_0_10px_rgba(250,204,21,0.5)]' : 'text-stone-600'" 
-                    />
-                  </button>
-                </div>
-              </div>
- 
-              <div class="mb-6">
-                <label class="block text-xs font-bold text-stone-400 mb-3 uppercase tracking-wider">متن نظر</label>
-                <textarea 
-                  v-model="newComment" 
-                  rows="5" 
-                  class="w-full p-4 rounded-2xl bg-white/10 border border-white/10 focus:border-accent focus:bg-white/20 outline-none transition text-white placeholder-stone-500 resize-none leading-relaxed"
-                  placeholder="نظر خود را درباره نقاط قوت و ضعف این محصول بنویسید..."
-                ></textarea>
-              </div>
- 
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-10 h-10 bg-white border border-stone-200 rounded-full flex items-center justify-center text-stone-500 font-bold text-sm shadow-sm">
+              {{ comment.profiles?.full_name ? comment.profiles.full_name.charAt(0) : 'U' }}
+            </div>
+            <div>
+              <div class="font-bold text-stone-800 text-sm">{{ comment.profiles?.full_name || 'کاربر ناشناس' }}</div>
+              <div class="text-[10px] text-stone-400 mt-0.5">{{ formatDate(comment.created_at) }}</div>
+            </div>
+            <div class="mr-auto flex gap-0.5 bg-white px-2 py-1 rounded-lg border border-stone-100">
+              <Star 
+                v-for="i in 5" 
+                :key="i" 
+                class="w-3 h-3" 
+                :class="i <= comment.rating ? 'fill-yellow-400 text-yellow-400' : 'text-stone-200'" 
+              />
+            </div>
+          </div>
+          
+          <p class="text-stone-600 text-sm leading-7 text-justify relative z-10">
+            {{ comment.content }}
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Form Section (Left - Dark Card) -->
+    <div class="lg:col-span-5 order-1 lg:order-2">
+      <div class="bg-stone-900 rounded-[32px] p-8 text-white sticky top-32 shadow-2xl shadow-stone-900/20">
+        <h4 class="font-bold text-xl mb-2">دیدگاه خود را بنویسید</h4>
+        <p class="text-stone-400 text-xs mb-8 leading-relaxed">نظر شما به انتخاب سایر کاربران کمک می‌کند.</p>
+        
+        <div v-if="authStore.isAuthenticated">
+          <div class="mb-6 text-center">
+            <label class="block text-xs font-bold text-stone-400 mb-3">امتیاز شما</label>
+            <div class="flex justify-center gap-2">
               <button 
-                @click="submitComment" 
-                :disabled="submitting"
-                class="w-full bg-white text-stone-900 py-4 rounded-xl font-black hover:bg-accent hover:text-white transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-70 shadow-lg"
+                v-for="i in 5" 
+                :key="i" 
+                @click="newRating = i"
+                class="transition hover:scale-110 focus:outline-none p-1"
               >
-                <Loader2 v-if="submitting" class="w-5 h-5 animate-spin" />
-                <span v-else>ثبت دیدگاه</span>
-                <Send v-if="!submitting" class="w-4 h-4" />
+                <Star 
+                  class="w-8 h-8 transition-colors" 
+                  :class="i <= newRating ? 'fill-yellow-400 text-yellow-400' : 'text-stone-700 fill-stone-700'" 
+                />
               </button>
             </div>
- 
-            <div v-else class="text-center py-12 bg-white/5 rounded-2xl border border-white/10 backdrop-blur-sm">
-              <User class="w-12 h-12 mx-auto text-stone-500 mb-4" />
-              <p class="text-stone-300 mb-6 font-medium">برای ثبت نظر باید وارد حساب کاربری خود شوید.</p>
-              <router-link to="/login" class="inline-block bg-white text-stone-900 px-8 py-3 rounded-xl font-bold hover:bg-stone-200 transition shadow-lg">
-                ورود / ثبت نام
-              </router-link>
-            </div>
           </div>
+
+          <div class="mb-6">
+            <label class="block text-xs font-bold text-stone-400 mb-3">متن نظر</label>
+            <textarea 
+              v-model="newComment" 
+              rows="4" 
+              class="w-full p-4 rounded-2xl bg-white/5 border border-white/10 focus:border-white/30 outline-none transition text-white placeholder-stone-600 resize-none text-sm leading-relaxed"
+              placeholder="نظر خود را درباره نقاط قوت و ضعف این محصول بنویسید..."
+            ></textarea>
+          </div>
+
+          <button 
+            @click="submitComment" 
+            :disabled="submitting"
+            class="w-full bg-white text-stone-900 py-4 rounded-xl font-bold hover:bg-stone-200 transition flex items-center justify-center gap-2 disabled:opacity-70"
+          >
+            <Loader2 v-if="submitting" class="w-4 h-4 animate-spin" />
+            <span v-else class="flex items-center gap-2">ثبت دیدگاه <Send class="w-4 h-4 rotate-180" /></span>
+          </button>
+        </div>
+
+        <div v-else class="text-center py-10 bg-white/5 rounded-2xl border border-white/10">
+          <User class="w-12 h-12 mx-auto text-stone-500 mb-4" />
+          <p class="text-stone-300 mb-6 text-sm font-bold">برای ثبت نظر ابتدا وارد شوید</p>
+          <router-link to="/login" class="inline-block bg-white text-stone-900 px-8 py-3 rounded-xl text-sm font-bold hover:bg-stone-200 transition">
+            ورود / ثبت نام
+          </router-link>
         </div>
       </div>
- 
-      <!-- Comments List (Right Side) -->
-      <div class="lg:col-span-7 order-1 lg:order-2">
-        <div v-if="commentStore.loading" class="text-center py-20">
-          <Loader2 class="w-10 h-10 animate-spin mx-auto text-stone-300" />
-        </div>
- 
-        <div v-else-if="commentStore.comments.length === 0" class="text-center py-20 bg-stone-50 rounded-[2rem] border border-dashed border-stone-200 h-full flex flex-col items-center justify-center">
-          <div class="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm mb-4 text-stone-300">
-            <MessageSquare class="w-8 h-8" />
-          </div>
-          <p class="text-stone-500 font-bold text-lg">هنوز نظری ثبت نشده است</p>
-          <p class="text-stone-400 text-sm mt-2">اولین نفری باشید که نظر می‌دهد!</p>
-        </div>
- 
-        <div v-else class="space-y-6 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
-          <div v-for="comment in commentStore.comments" :key="comment.id" class="bg-stone-50 p-6 rounded-[2rem] border border-stone-100 hover:border-stone-200 transition-colors duration-300">
-            <div class="flex items-start justify-between mb-4">
-              <div class="flex items-center gap-4">
-                <div class="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-stone-500 shadow-sm border border-stone-100 font-bold text-lg">
-                  {{ comment.profiles?.full_name ? comment.profiles.full_name.charAt(0) : 'U' }}
-                </div>
-                <div>
-                  <div class="font-bold text-stone-800 text-base">{{ comment.profiles?.full_name || 'کاربر ناشناس' }}</div>
-                  <div class="text-xs text-stone-400 mt-1 font-medium">{{ formatDate(comment.created_at) }}</div>
-                </div>
-              </div>
-              <div class="flex gap-1 bg-white px-3 py-1.5 rounded-full border border-stone-100 shadow-sm">
-                <Star 
-                  v-for="i in 5" 
-                  :key="i" 
-                  class="w-3.5 h-3.5" 
-                  :class="i <= comment.rating ? 'fill-yellow-400 text-yellow-400' : 'text-stone-200'" 
-                />
-              </div>
-            </div>
-            
-            <div class="relative pl-8">
-              <Quote class="w-8 h-8 text-stone-200 absolute -top-2 -right-2 transform -scale-x-100" />
-              <p class="text-stone-600 leading-loose text-sm font-medium text-justify relative z-10">
-                {{ comment.content }}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
- 
     </div>
+
   </div>
 </template>
- 
-<style scoped>
-.custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
-}
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-}
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background-color: #e7e5e4;
-  border-radius: 20px;
-}
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background-color: #d6d3d1;
-}
-</style>
