@@ -113,6 +113,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: 'مدیریت نظرات' },
       },
       {
+        path: 'newsletter',
+        name: 'admin-newsletter',
+        component: () => import('../components/admin/AdminNewsletter.vue'),
+        meta: { title: 'مدیریت خبرنامه' },
+      },
+      {
         path: 'settings',
         name: 'admin-settings',
         component: () => import('../views/admin/AdminSettings.vue'),

@@ -53,6 +53,21 @@ add column if not exists cost_type text default 'fixed' check (cost_type in ('fi
 
 -- 7. رفرش کردن کش Schema (اختیاری)
 NOTIFY pgrst, 'reload schema';
+
+-- 8. فعال‌سازی امنیت جدول محصولات (RLS)
+alter table public.products enable row level security;
+
+drop policy if exists "Public can view products" on public.products;
+create policy "Public can view products" on public.products for select using ( true );
+
+drop policy if exists "Admins can insert products" on public.products;
+create policy "Admins can insert products" on public.products for insert with check ( auth.role() = 'authenticated' );
+
+drop policy if exists "Admins can update products" on public.products;
+create policy "Admins can update products" on public.products for update using ( auth.role() = 'authenticated' );
+
+drop policy if exists "Admins can delete products" on public.products;
+create policy "Admins can delete products" on public.products for delete using ( auth.role() = 'authenticated' );
 `
 
 const copySql = () => {

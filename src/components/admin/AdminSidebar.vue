@@ -13,7 +13,8 @@ import {
   Layers,
   Globe,
   BadgePercent,
-  MessageSquare
+  MessageSquare,
+  Mail
 } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 import { useRoute } from 'vue-router'
@@ -49,6 +50,7 @@ const menuGroups = [
     title: 'کاربران',
     items: [
       { routeName: 'admin-users', label: 'لیست مشتریان', icon: Users },
+      { routeName: 'admin-newsletter', label: 'اعضای خبرنامه', icon: Mail },
     ]
   },
   {
