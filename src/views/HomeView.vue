@@ -1,13 +1,20 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { ArrowLeft, ArrowDown, Star, Play, Leaf, ShieldCheck, Truck } from 'lucide-vue-next'
+import { ArrowLeft, ArrowDown, Star, Play, Leaf, ShieldCheck, Truck, Loader2 } from 'lucide-vue-next'
 import ProductCard from '@/components/ProductCard.vue'
 import { useHead } from '@vueuse/head'
 import { useProductStore } from '@/stores/product'
+import { useToastStore } from '@/stores/toast'
+import { supabase } from '@/lib/supabase'
 
 const productStore = useProductStore()
+const toastStore = useToastStore()
 const featuredProducts = ref<any[]>([])
 const loadingFeatured = ref(true)
+
+// Newsletter State
+const newsletterEmail = ref('')
+const newsletterLoading = ref(false)
 
 // تنظیمات سئو صفحه اصلی
 useHead({
@@ -32,6 +39,36 @@ onMounted(async () => {
   }
   loadingFeatured.value = false
 })
+
+const subscribeNewsletter = async () => {
+  if (!newsletterEmail.value || !/^\S+@\S+\.\S+$/.test(newsletterEmail.value)) {
+    toastStore.showToast('لطفا یک ایمیل معتبر وارد کنید', 'warning')
+    return
+  }
+
+  newsletterLoading.value = true
+  try {
+    const { error } = await supabase
+      .from('newsletter_subscribers')
+      .insert({ email: newsletterEmail.value })
+
+    if (error) {
+      if (error.code === '23505') { // Unique violation
+        toastStore.showToast('این ایمیل قبلاً ثبت شده است', 'info')
+      } else {
+        throw error
+      }
+    } else {
+      toastStore.showToast('با موفقیت در خبرنامه عضو شدید', 'success')
+      newsletterEmail.value = ''
+    }
+  } catch (e: any) {
+    console.error(e)
+    toastStore.showToast('خطا در ثبت ایمیل', 'error')
+  } finally {
+    newsletterLoading.value = false
+  }
+}
 </script>
 
 <template>
@@ -279,8 +316,21 @@ onMounted(async () => {
         <h2 class="text-4xl font-black text-stone-900 mb-6">عضویت در خبرنامه</h2>
         <p class="text-stone-600 mb-10 text-lg">برای اطلاع از تخفیف‌ها و محصولات جدید ایمیل خود را وارد کنید.</p>
         <div class="max-w-lg mx-auto flex bg-white p-2 rounded-full shadow-2xl transform hover:scale-105 transition duration-300">
-          <input type="email" placeholder="ایمیل شما..." class="flex-grow px-8 bg-transparent outline-none text-stone-700 placeholder-stone-400 text-lg">
-          <button class="bg-stone-900 text-white px-10 py-4 rounded-full font-bold hover:bg-accent transition duration-300">عضویت</button>
+          <input 
+            v-model="newsletterEmail"
+            @keyup.enter="subscribeNewsletter"
+            type="email" 
+            placeholder="ایمیل شما..." 
+            class="flex-grow px-8 bg-transparent outline-none text-stone-700 placeholder-stone-400 text-lg dir-ltr text-left"
+          >
+          <button 
+            @click="subscribeNewsletter" 
+            :disabled="newsletterLoading"
+            class="bg-stone-900 text-white px-10 py-4 rounded-full font-bold hover:bg-accent transition duration-300 flex items-center gap-2 disabled:opacity-70"
+          >
+            <Loader2 v-if="newsletterLoading" class="w-5 h-5 animate-spin" />
+            <span v-else>عضویت</span>
+          </button>
         </div>
       </div>
     </section>
