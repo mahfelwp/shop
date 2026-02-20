@@ -34,6 +34,8 @@ type Product = {
   gallery: string[] | null
   video: string | null
   stock: number
+  min_order: number | null
+  max_order: number | null
 }
 
 type RelatedProduct = Pick<Product, 'id' | 'slug' | 'title' | 'price' | 'image' | 'category'>
@@ -82,13 +84,19 @@ const shortDescription = computed(() => {
 
 const stock = computed(() => product.value?.stock ?? 0)
 const inStock = computed(() => stock.value > 0)
-const maxQty = computed(() => (inStock.value ? stock.value : 1))
+
+const minQty = computed(() => product.value?.min_order ?? 1)
+const maxQty = computed(() => {
+  const s = inStock.value ? stock.value : 1
+  const m = product.value?.max_order ?? 999999
+  return Math.min(s, m)
+})
 
 const canIncrement = computed(() => inStock.value && quantity.value < maxQty.value)
-const canDecrement = computed(() => quantity.value > 1)
+const canDecrement = computed(() => quantity.value > minQty.value)
 
 function clampQty() {
-  if (quantity.value < 1) quantity.value = 1
+  if (quantity.value < minQty.value) quantity.value = minQty.value
   if (quantity.value > maxQty.value) quantity.value = maxQty.value
 }
 
@@ -147,7 +155,7 @@ function routeParamFor(p: { id: number; slug: string | null }): string {
 async function fetchProduct(param: string): Promise<Product | null> {
   let query = supabase
     .from('products')
-    .select('id, slug, title, description, category, is_featured, price, image, gallery, video, stock')
+    .select('id, slug, title, description, category, is_featured, price, image, gallery, video, stock, min_order, max_order')
 
   query = isNumericId(param) ? query.eq('id', Number(param)) : query.eq('slug', param)
 
@@ -212,7 +220,7 @@ async function load() {
     }
 
     product.value = data
-    quantity.value = 1
+    quantity.value = data.min_order ?? 1
     clampQty()
 
     // pick initial media
@@ -233,7 +241,8 @@ function addToCart() {
   if (!product.value) return
   if (!inStock.value) return
   clampQty()
-  for (let i = 0; i < quantity.value; i++) cartStore.addItem(product.value)
+  // ارسال تعداد دقیق به استور
+  cartStore.addItem(product.value, quantity.value)
 }
 
 function incrementQty() {

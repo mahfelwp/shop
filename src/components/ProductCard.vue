@@ -14,6 +14,8 @@ const props = defineProps<{
     isNew?: boolean
     discount?: number
     slug?: string
+    min_order?: number
+    max_order?: number
   }
 }>()
 

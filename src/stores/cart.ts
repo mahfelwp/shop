@@ -28,19 +28,24 @@ export const useCartStore = defineStore('cart', () => {
     localStorage.setItem('cart_items', JSON.stringify(newItems))
   }, { deep: true })
  
-  const addItem = (product: Product) => {
+  const addItem = (product: Product, count: number = 1) => {
     const existingItem = items.value.find(item => item.id === product.id)
     const minOrder = product.min_order || 1
     const maxOrder = product.max_order || 999999
  
     if (existingItem) {
-      if (existingItem.quantity < maxOrder) {
-        existingItem.quantity++
+      if (existingItem.quantity + count <= maxOrder) {
+        existingItem.quantity += count
+        toastStore.showToast('سبد خرید بروزرسانی شد', 'success', 1500)
       } else {
         toastStore.showToast(`حداکثر تعداد سفارش برای این محصول ${maxOrder} عدد است`, 'warning')
       }
     } else {
-      items.value.push({ ...product, quantity: minOrder })
+      // اگر محصول جدید است، مطمئن می‌شویم که حداقل تعداد رعایت شده است
+      // اگر کاربر تعداد خاصی را انتخاب کرده (count)، از آن استفاده می‌کنیم (به شرطی که از minOrder کمتر نباشد)
+      // اگر count برابر 1 باشد (مثلا از دکمه افزودن سریع)، minOrder اعمال می‌شود
+      const finalQty = Math.max(minOrder, count)
+      items.value.push({ ...product, quantity: finalQty })
       toastStore.showToast('به سبد خرید اضافه شد', 'success', 1500)
     }
   }
