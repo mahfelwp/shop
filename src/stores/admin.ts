@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { supabase } from '@/lib/supabase'
+import type { RealtimeChannel } from '@supabase/supabase-js'
 
 export const useAdminStore = defineStore('admin', () => {
   const stats = ref({
@@ -14,6 +15,9 @@ export const useAdminStore = defineStore('admin', () => {
   const orders = ref<any[]>([])
   const categoryStats = ref<any[]>([])
   const loading = ref(false)
+  
+  // نگهداری رفرنس کانال ریل‌تایم
+  let realtimeChannel: RealtimeChannel | null = null
 
   // محاسبه داده‌های نمودار (فروش ۷ روز گذشته)
   const chartData = computed(() => {
@@ -57,7 +61,9 @@ export const useAdminStore = defineStore('admin', () => {
   // --- Actions ---
 
   const fetchStats = async () => {
-    loading.value = true
+    // اگر در حال لودینگ هستیم (مثلا توسط ریل‌تایم فراخوانی شده)، دوباره لودینگ را true نکنیم تا UI پرپر نزند
+    if (!loading.value) loading.value = true
+    
     try {
       // 1. Products Count
       const { count: pCount } = await supabase
@@ -65,7 +71,6 @@ export const useAdminStore = defineStore('admin', () => {
         .select('*', { count: 'exact', head: true })
       
       // 2. Orders Data (دریافت همه سفارشات برای محاسبه دقیق آمار)
-      // اصلاح: اضافه کردن id و product_id به کوئری تو در تو
       const { data: oData, count: oCount } = await supabase
         .from('orders')
         .select(`
@@ -146,16 +151,66 @@ export const useAdminStore = defineStore('admin', () => {
       .eq('id', orderId)
 
     if (!error) {
+      // نیازی به آپدیت دستی نیست چون ریل‌تایم انجام می‌دهد، اما برای سرعت بیشتر UI آپدیت می‌کنیم
       const index = orders.value.findIndex(o => o.id === orderId)
       if (index !== -1) {
         orders.value[index].status = status
         orders.value[index].tracking_code = trackingCode
       }
-      // آپدیت مجدد آمار برای اطمینان از صحت داده‌ها
-      await fetchStats()
     }
     return error
   }
 
-  return { stats, orders, categoryStats, loading, chartData, fetchStats, updateOrderStatus }
+  // --- Realtime Logic ---
+  
+  // تابع Debounce برای جلوگیری از درخواست‌های زیاد پشت سر هم
+  let debounceTimer: any = null
+  const debouncedFetch = () => {
+    if (debounceTimer) clearTimeout(debounceTimer)
+    debounceTimer = setTimeout(() => {
+      console.log('Realtime update received, refreshing stats...')
+      fetchStats()
+    }, 1000)
+  }
+
+  const subscribeToStats = () => {
+    if (realtimeChannel) return // قبلاً سابسکرایب شده
+
+    realtimeChannel = supabase.channel('admin-stats-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'orders' },
+        () => debouncedFetch()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'products' },
+        () => debouncedFetch()
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('Admin stats subscribed to realtime changes')
+        }
+      })
+  }
+
+  const unsubscribeFromStats = () => {
+    if (realtimeChannel) {
+      supabase.removeChannel(realtimeChannel)
+      realtimeChannel = null
+      console.log('Admin stats unsubscribed')
+    }
+  }
+
+  return { 
+    stats, 
+    orders, 
+    categoryStats, 
+    loading, 
+    chartData, 
+    fetchStats, 
+    updateOrderStatus,
+    subscribeToStats,
+    unsubscribeFromStats
+  }
 })

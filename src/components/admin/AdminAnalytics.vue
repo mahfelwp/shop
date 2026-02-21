@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { onMounted, onUnmounted } from 'vue'
 import { useAdminStore } from '@/stores/admin'
 import SimpleBarChart from '@/components/admin/charts/SimpleBarChart.vue'
 import { TrendingUp, Users, ShoppingCart, DollarSign, Activity, ShoppingBag } from 'lucide-vue-next'
@@ -8,6 +8,11 @@ const adminStore = useAdminStore()
 
 onMounted(() => {
   adminStore.fetchStats()
+  adminStore.subscribeToStats()
+})
+
+onUnmounted(() => {
+  adminStore.unsubscribeFromStats()
 })
 </script>
 
@@ -16,7 +21,7 @@ onMounted(() => {
     <!-- Header -->
     <div>
       <h2 class="text-2xl font-bold text-gray-800">آمار و گزارشات تحلیلی</h2>
-      <p class="text-gray-500 text-sm mt-1">بررسی عملکرد فروشگاه بر اساس داده‌های واقعی</p>
+      <p class="text-gray-500 text-sm mt-1">بررسی عملکرد فروشگاه بر اساس داده‌های واقعی (بروزرسانی زنده)</p>
     </div>
 
     <!-- KPI Cards -->
@@ -26,7 +31,7 @@ onMounted(() => {
           <div class="p-3 bg-indigo-50 rounded-xl text-indigo-600">
             <DollarSign class="w-6 h-6" />
           </div>
-          <span class="flex items-center text-green-600 text-xs font-bold bg-green-50 px-2 py-1 rounded-lg">
+          <span class="flex items-center text-green-600 text-xs font-bold bg-green-50 px-2 py-1 rounded-lg animate-pulse">
             <TrendingUp class="w-3 h-3 mr-1" /> درآمد
           </span>
         </div>

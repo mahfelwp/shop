@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useAdminStore } from '@/stores/admin'
 import { supabase } from '@/lib/supabase'
-import { TrendingUp, DollarSign, ShoppingBag, Clock, ArrowLeft, CheckCircle2, AlertCircle, AlertTriangle, ArrowRight } from 'lucide-vue-next'
+import { TrendingUp, DollarSign, ShoppingBag, Clock, ArrowLeft, CheckCircle2, AlertCircle, AlertTriangle, ArrowRight, Radio } from 'lucide-vue-next'
 import SimpleBarChart from '@/components/admin/charts/SimpleBarChart.vue'
 import { useRouter } from 'vue-router'
 
@@ -12,8 +12,15 @@ const lowStockProducts = ref<any[]>([])
 const loadingLowStock = ref(false)
 
 onMounted(async () => {
-  adminStore.fetchStats()
+  await adminStore.fetchStats()
+  // فعال‌سازی ریل‌تایم
+  adminStore.subscribeToStats()
   fetchLowStock()
+})
+
+onUnmounted(() => {
+  // غیرفعال‌سازی ریل‌تایم برای جلوگیری از مموری لیک
+  adminStore.unsubscribeFromStats()
 })
 
 // دریافت کالاهای کم موجودی برای نمایش در داشبورد
@@ -127,10 +134,10 @@ const getStatusText = (status: string) => {
           </div>
         </div>
         <div class="flex items-center gap-2 text-xs">
-          <span class="text-green-600 flex items-center font-bold bg-green-50 px-1.5 py-0.5 rounded">
-            <TrendingUp class="w-3 h-3 mr-1" /> بروزرسانی
+          <span class="text-green-600 flex items-center font-bold bg-green-50 px-1.5 py-0.5 rounded animate-pulse">
+            <Radio class="w-3 h-3 mr-1" /> زنده
           </span>
-          <span class="text-stone-400">لحظه‌ای</span>
+          <span class="text-stone-400">بروزرسانی خودکار</span>
         </div>
       </div>
 
