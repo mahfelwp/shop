@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AdminSidebar from '@/components/admin/AdminSidebar.vue'
-import { Menu, Bell, Search, User, ChevronDown, LogOut, Settings, X, ShoppingBag, UserPlus, Globe } from 'lucide-vue-next'
+import { Menu, Bell, Search, User, ChevronDown, LogOut, Settings, X, ShoppingBag, UserPlus, Globe, MessageSquare } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 import { supabase } from '@/lib/supabase'
+import type { RealtimeChannel } from '@supabase/supabase-js'
 
 const authStore = useAuthStore()
 const route = useRoute()
@@ -17,6 +18,7 @@ const showProfileMenu = ref(false)
 const globalSearch = ref('')
 const notifications = ref<any[]>([])
 const loadingNotifs = ref(false)
+let realtimeChannel: RealtimeChannel | null = null
 
 const toggleSidebar = () => isSidebarOpen.value = !isSidebarOpen.value
 const pageTitle = computed(() => route.meta.title || 'پنل مدیریت')
@@ -41,9 +43,10 @@ const getTimeAgo = (dateString: string) => {
 }
 
 // --- Fetch Real Notifications ---
-const fetchNotifications = async () => {
-  loadingNotifs.value = true
-  notifications.value = []
+const fetchNotifications = async (background = false) => {
+  if (!background) loadingNotifs.value = true
+  // استفاده از آرایه موقت برای جلوگیری از پرش UI
+  const tempNotifs: any[] = []
 
   try {
     // 1. دریافت آخرین سفارشات (۵ مورد اخیر)
@@ -55,7 +58,7 @@ const fetchNotifications = async () => {
 
     if (recentOrders) {
       recentOrders.forEach(order => {
-        notifications.value.push({
+        tempNotifs.push({
           id: `order-${order.id}`,
           title: `سفارش جدید #${order.id}`,
           desc: `${order.receiver_name} - ${order.total_price.toLocaleString()} تومان`,
@@ -77,7 +80,7 @@ const fetchNotifications = async () => {
 
     if (recentUsers) {
       recentUsers.forEach(user => {
-        notifications.value.push({
+        tempNotifs.push({
           id: `user-${user.id}`,
           title: `کاربر جدید: ${user.full_name || 'بدون نام'}`,
           desc: 'ثبت نام در سیستم',
@@ -90,18 +93,79 @@ const fetchNotifications = async () => {
       })
     }
 
+    // 3. دریافت آخرین نظرات (۳ مورد اخیر)
+    const { data: recentComments } = await supabase
+      .from('comments')
+      .select('id, created_at, content, products(title)')
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false })
+      .limit(3)
+
+    if (recentComments) {
+      recentComments.forEach(comment => {
+        const productTitle = comment.products?.title || 'محصول'
+        tempNotifs.push({
+          id: `comment-${comment.id}`,
+          title: `نظر جدید برای ${productTitle}`,
+          desc: comment.content.substring(0, 40) + (comment.content.length > 40 ? '...' : ''),
+          time: getTimeAgo(comment.created_at),
+          rawTime: new Date(comment.created_at).getTime(),
+          icon: MessageSquare,
+          color: 'text-orange-600 bg-orange-50',
+          route: 'admin-comments'
+        })
+      })
+    }
+
     // مرتب‌سازی بر اساس زمان (جدیدترین اول)
-    notifications.value.sort((a, b) => b.rawTime - a.rawTime)
+    tempNotifs.sort((a, b) => b.rawTime - a.rawTime)
+    notifications.value = tempNotifs
 
   } catch (error) {
     console.error('Error fetching notifications:', error)
   } finally {
-    loadingNotifs.value = false
+    if (!background) loadingNotifs.value = false
   }
+}
+
+const subscribeToRealtime = () => {
+  realtimeChannel = supabase.channel('admin-header-notifs')
+    .on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'orders' },
+      () => {
+        // سفارش جدید ثبت شد -> بروزرسانی لیست
+        fetchNotifications(true)
+      }
+    )
+    .on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'profiles' },
+      () => {
+        // کاربر جدید ثبت نام کرد -> بروزرسانی لیست
+        fetchNotifications(true)
+      }
+    )
+    .on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'comments' },
+      () => {
+        // نظر جدید ثبت شد -> بروزرسانی لیست
+        fetchNotifications(true)
+      }
+    )
+    .subscribe()
 }
 
 onMounted(() => {
   fetchNotifications()
+  subscribeToRealtime()
+})
+
+onUnmounted(() => {
+  if (realtimeChannel) {
+    supabase.removeChannel(realtimeChannel)
+  }
 })
 
 // --- Actions ---
@@ -227,7 +291,7 @@ const closeDropdowns = () => {
                 </div>
                 
                 <div class="p-3 text-center border-t border-gray-50 bg-gray-50">
-                  <button @click="fetchNotifications" class="text-xs font-bold text-indigo-600 hover:text-indigo-700">بروزرسانی لیست</button>
+                  <button @click="fetchNotifications(false)" class="text-xs font-bold text-indigo-600 hover:text-indigo-700">بروزرسانی لیست</button>
                 </div>
               </div>
             </div>

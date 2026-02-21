@@ -68,6 +68,16 @@ create policy "Admins can update products" on public.products for update using (
 
 drop policy if exists "Admins can delete products" on public.products;
 create policy "Admins can delete products" on public.products for delete using ( auth.role() = 'authenticated' );
+
+-- 9. فعال‌سازی قابلیت Realtime (رفع خطای Unable to subscribe)
+-- این دستورات جداول مهم را به لیست انتشار ریل‌تایم اضافه می‌کنند
+begin;
+  alter publication supabase_realtime add table public.products;
+  alter publication supabase_realtime add table public.orders;
+  alter publication supabase_realtime add table public.profiles;
+  alter publication supabase_realtime add table public.comments;
+  alter publication supabase_realtime add table public.coupons;
+commit;
 `
 
 const copySql = () => {
